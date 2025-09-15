@@ -888,7 +888,7 @@ class _DonutPainter extends CustomPainter {
 }
 
 class _ReportIssueSheet extends StatefulWidget {
-  const _ReportIssueSheet({this.prefill});
+  const _ReportIssueSheet(this.prefill);
   final String? prefill;
 
   @override

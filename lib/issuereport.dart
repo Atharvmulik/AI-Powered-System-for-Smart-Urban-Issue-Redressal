@@ -56,7 +56,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   bool _hasAttachmentVideo = false;
   bool _hasAttachmentVoice = false;
   bool _showOtherIssue = false;
-  bool _showManualLocation = false;
+  final bool _showManualLocation = false;
   bool _showTextDescription = false;
 
   // color tokens (used selectively)
