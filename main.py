@@ -10,25 +10,35 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import from our app
 from app import models
 from app.database import get_db, engine
-from app.models import Report, User, Category, Status  # Added Category and Status
+from app.models import Report, User, Category, Status
 from app.schemas import UserCreate, UserResponse, UserLogin  
 from app.auth_utils import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM  
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# Create the database tables (in production, use Alembic migrations instead)
-models.Base.metadata.create_all(bind=engine)
+from sqlalchemy.ext.asyncio import AsyncEngine
 
+# ✅ Create the database tables on startup (for async engine)
 app = FastAPI(title="Smart Urban Issue Redressal API", version="0.1.0")
+
+@app.on_event("startup")
+async def on_startup():
+    if isinstance(engine, AsyncEngine):
+        async with engine.begin() as conn:
+            await conn.run_sync(models.Base.metadata.create_all)
+    else:
+        # fallback if using sync engine
+        models.Base.metadata.create_all(bind=engine)
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins (for development only)
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 
 # Add this function to verify tokens
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
