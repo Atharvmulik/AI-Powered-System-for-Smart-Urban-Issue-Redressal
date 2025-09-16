@@ -1,21 +1,18 @@
-# main.py
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from jose import JWTError, jwt
+from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer
 from app.ai_model import predict_category
-
-
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import from our app
 from app import models
 from app.database import get_db, engine
-from app.models import Report, User  
+from app.models import Report, User, Category, Status  # Added Category and Status
 from app.schemas import UserCreate, UserResponse, UserLogin  
 from app.auth_utils import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM  
-
-
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -24,7 +21,14 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Smart Urban Issue Redressal API", version="0.1.0")
 
-
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins (for development only)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Add this function to verify tokens
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -61,6 +65,61 @@ async def get_current_admin(current_user: User = Depends(get_current_user)):
 def read_root():
     return {"message": "Welcome to the Smart Urban Issue Redressal API"}
 
+# Database initialization endpoint
+@app.post("/init-db")
+def initialize_database(db: Session = Depends(get_db)):
+    """
+    Initialize the database with default categories and statuses.
+    This should only be run once when setting up the application.
+    """
+    try:
+        # Create default categories if they don't exist
+        categories = [
+            Category(name="Infrastructure", description="Roads, bridges, public facilities"),
+            Category(name="Sanitation", description="Waste management, cleanliness"),
+            Category(name="Public Safety", description="Safety and security issues"),
+            Category(name="Utilities", description="Water, electricity, gas services"),
+            Category(name="Environment", description="Parks, pollution, green spaces"),
+        ]
+        
+        for category in categories:
+            if not db.query(Category).filter(Category.name == category.name).first():
+                db.add(category)
+        
+        # Create default statuses if they don't exist
+        statuses = [
+            Status(name="Reported", description="Issue has been reported"),
+            Status(name="In Progress", description="Issue is being addressed"),
+            Status(name="Resolved", description="Issue has been resolved"),
+            Status(name="Closed", description="Issue has been closed"),
+        ]
+        
+        for status in statuses:
+            if not db.query(Status).filter(Status.name == status.name).first():
+                db.add(status)
+        
+        # Create admin user if it doesn't exist
+        if not db.query(User).filter(User.email == "admin@urbanissues.com").first():
+            admin_user = User(
+                email="admin@urbanissues.com",
+                hashed_password=get_password_hash("admin123"),
+                full_name="Administrator",
+                is_admin=True
+            )
+            db.add(admin_user)
+        
+        # Commit changes
+        db.commit()
+        
+        return {"message": "Database initialized successfully!", "admin_credentials": {"email": "admin@urbanissues.com", "password": "admin123"}}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error initializing database: {str(e)}"
+        )
+
 # Endpoint to get all reports
 @app.get("/reports/", response_model=List[dict])
 def read_reports(db: Session = Depends(get_db)):
@@ -80,13 +139,29 @@ def create_report(
     # AI MAGIC: Predict the category automatically!
     predicted_category = predict_category(description)
     
+    # Get or create the category
+    category = db.query(Category).filter(Category.name == predicted_category).first()
+    if not category:
+        category = Category(name=predicted_category, description="AI-predicted category")
+        db.add(category)
+        db.commit()
+        db.refresh(category)
+    
+    # Get the default status
+    status = db.query(Status).filter(Status.name == "Reported").first()
+    if not status:
+        status = Status(name="Reported", description="Issue has been reported")
+        db.add(status)
+        db.commit()
+        db.refresh(status)
+    
     db_report = Report(
         title=title,
         description=description,
-        category=predicted_category,  # Now using AI prediction!
+        category_id=category.id,
+        status_id=status.id,
         location_lat=location_lat,
         location_long=location_long,
-        status="pending",
         user_id=current_user.id
     )
     db.add(db_report)
@@ -120,7 +195,7 @@ def update_report_status(
     report_id: int, 
     new_status: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin)  # ← CHANGE TO get_current_admin
+    current_user: User = Depends(get_current_admin)  # Only admins can update status
 ):
     # Find the report
     db_report = db.query(Report).filter(Report.id == report_id).first()
@@ -131,8 +206,16 @@ def update_report_status(
             detail=f"Report with ID {report_id} not found"
         )
     
+    # Find the status
+    status = db.query(Status).filter(Status.name == new_status).first()
+    if not status:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Status '{new_status}' is not valid"
+        )
+    
     # Update the status
-    db_report.status = new_status
+    db_report.status_id = status.id
     db.commit()
     db.refresh(db_report)
     
@@ -143,7 +226,7 @@ def update_report_status(
 def delete_report(
     report_id: int, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin)  # ✅ Only admins can delete
+    current_user: User = Depends(get_current_admin)  # Only admins can delete
 ):
     # Find the report
     db_report = db.query(Report).filter(Report.id == report_id).first()
@@ -159,9 +242,6 @@ def delete_report(
     db.commit()
     
     return {"message": f"Report with ID {report_id} has been successfully deleted."}
-
-
-
 
 # --- NEW: User Signup Endpoint ---
 @app.post("/signup", response_model=UserResponse)
@@ -230,11 +310,6 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
         "message": "Login successful! Redirecting to dashboard..."
     }
 
-
-
-
-
-
 # --- Get current user's profile ---
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_user)):
@@ -261,14 +336,16 @@ async def read_all_reports(
     all_reports = db.query(Report).all()
     return all_reports
 
+# --- Get all categories ---
+@app.get("/categories")
+async def get_categories(db: Session = Depends(get_db)):
+    """Get all available categories."""
+    categories = db.query(Category).all()
+    return categories
 
-
-
-
-# from app.database import SessionLocal
-# from app.models import User
-
-# db = SessionLocal()
-# users = db.query(User).all()
-# for user in users:
-#     print(f"ID: {user.id}, Email: {user.email}, Admin: {user.is_admin}")
+# --- Get all statuses ---
+@app.get("/statuses")
+async def get_statuses(db: Session = Depends(get_db)):
+    """Get all available statuses."""
+    statuses = db.query(Status).all()
+    return statuses

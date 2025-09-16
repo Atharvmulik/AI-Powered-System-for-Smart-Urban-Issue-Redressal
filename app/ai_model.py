@@ -1,36 +1,37 @@
 # app/ai_model.py
 # Sample training data - we'll use this to train our AI model
 training_data = [
-    {"text": "huge pothole on main road near hospital", "category": "pothole"},
-    {"text": "garbage pile growing on street corner", "category": "garbage"},
-    {"text": "street light not working for 3 days", "category": "broken_streetlight"},
-    {"text": "water leakage from broken pipe", "category": "water_leakage"},
-    {"text": "graffiti on public walls", "category": "graffiti"},
-    {"text": "road damaged with cracks", "category": "road_damage"},
-    {"text": "trash not collected for a week", "category": "garbage"},
-    {"text": "broken traffic signal causing chaos", "category": "traffic_signal"},
-    {"text": "deep pothole damaging vehicles", "category": "pothole"},
-    {"text": "street light pole bent and dangerous", "category": "broken_streetlight"}
+    {"text": "huge pothole on main road near hospital", "category": "Infrastructure"},
+    {"text": "garbage pile growing on street corner", "category": "Sanitation"},
+    {"text": "street light not working for 3 days", "category": "Infrastructure"},
+    {"text": "water leakage from broken pipe", "category": "Utilities"},
+    {"text": "graffiti on public walls", "category": "Public Safety"},
+    {"text": "road damaged with cracks", "category": "Infrastructure"},
+    {"text": "trash not collected for a week", "category": "Sanitation"},
+    {"text": "broken traffic signal causing chaos", "category": "Public Safety"},
+    {"text": "deep pothole damaging vehicles", "category": "Infrastructure"},
+    {"text": "street light pole bent and dangerous", "category": "Infrastructure"},
+    {"text": "park bench broken and needs repair", "category": "Environment"},
+    {"text": "air pollution from factory smoke", "category": "Environment"},
+    {"text": "unsafe sidewalk with uneven pavement", "category": "Infrastructure"},
+    {"text": "stray animals causing nuisance", "category": "Public Safety"},
+    {"text": "water supply interrupted", "category": "Utilities"}
 ]
 
-# This is a simple AI classifier (we'll improve it later)
+# This is a simple AI classifier
 def predict_category(text_description):
     """Simple rule-based classifier for now - we'll replace with real ML later"""
     text = text_description.lower()
     
-    if "pothole" in text:
-        return "pothole"
-    elif "garbage" in text or "trash" in text:
-        return "garbage"
-    elif "street light" in text or "light" in text:
-        return "broken_streetlight"
-    elif "water" in text or "leak" in text:
-        return "water_leakage"
-    elif "graffiti" in text:
-        return "graffiti"
-    elif "road" in text or "crack" in text:
-        return "road_damage"
-    elif "traffic" in text or "signal" in text:
-        return "traffic_signal"
+    if "pothole" in text or "road" in text or "street" in text or "bridge" in text:
+        return "Infrastructure"
+    elif "garbage" in text or "trash" in text or "waste" in text or "clean" in text:
+        return "Sanitation"
+    elif "water" in text or "pipe" in text or "leak" in text or "supply" in text:
+        return "Utilities"
+    elif "safety" in text or "crime" in text or "police" in text or "security" in text:
+        return "Public Safety"
+    elif "park" in text or "tree" in text or "environment" in text or "pollution" in text:
+        return "Environment"
     else:
-        return "other"
+        return "Infrastructure"  # Default category

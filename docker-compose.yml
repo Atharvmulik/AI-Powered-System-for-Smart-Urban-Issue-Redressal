@@ -1,17 +1,23 @@
-version: '3.8'
-
+# docker-compose.yml
 services:
-  db:
+  postgres:
     image: postgres:15
     container_name: urban_db
     environment:
+      POSTGRES_DB: urban_db
       POSTGRES_USER: urban_user
       POSTGRES_PASSWORD: urban_password
-      POSTGRES_DB: urban_issues_db
+      POSTGRES_HOST_AUTH_METHOD: trust  # This allows connections without password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urban_user -d urban_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:

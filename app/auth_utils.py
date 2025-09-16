@@ -2,25 +2,27 @@
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
 
-# Configuration (you can change the secret key later)
-SECRET_KEY = "your-secret-key-here"  # TODO: Make this strong and use environment variables
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Load environment variables
+load_dotenv()
 
-# Setup password hashing
+# Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# JWT Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+
 def verify_password(plain_password, hashed_password):
-    """Check if a plain text password matches its hashed version."""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
-    """Hash a plain text password."""
     return pwd_context.hash(password)
 
 def create_access_token(data: dict):
-    """Create a JWT access token with an expiration time."""
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
