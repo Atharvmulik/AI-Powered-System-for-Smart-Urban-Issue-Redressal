@@ -1,32 +1,7 @@
 import 'package:flutter/material.dart';
-import 'correcteddashboard.dart';  // 👈 adjust filename to match your dashboard file
-
-
-void main() => runApp(const ReportIssueApp());
 
 const _indigo = Colors.indigo;
 const _green = Colors.green;
-
-class ReportIssueApp extends StatelessWidget {
-
-  const ReportIssueApp({super.key});
-  @override
-  Widget build(BuildContext context) {
-    // Global theme - indigo seed + teal/green accents
-    final seed = const Color(0xFF3F51B5); // indigo (your attached indigo)
-    return MaterialApp(
-      title: 'CivicEye - Report Issue',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
-        useMaterial3: true,
-        textTheme: ThemeData.light().textTheme.apply(fontFamily: 'Roboto'),
-      ),
-      home: const DashboardScreen(),
-
-    );
-  }
-}
 
 /// ====================== PAGE ======================
 class ReportIssuePage extends StatefulWidget {
@@ -34,7 +9,6 @@ class ReportIssuePage extends StatefulWidget {
 
   const ReportIssuePage({super.key, required this.category});
 
-  // const ReportIssuePage({super.key});
   @override
   State<ReportIssuePage> createState() => _ReportIssuePageState();
 }
@@ -62,10 +36,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   // color tokens (used selectively)
   static const Color _indigo = Color(0xFF3F51B5); // main indigo
   static const Color _indigoLight = Color(0xFF6F7BE6);
-  // static const Color _teal = Color(0xFF26A69A);
-  // static const Color _green = Color(0xFF16A34A);
-  // static const Color _amber = Color(0xFFFACC15);
-  // static const Color _nearBlack = Color(0xFF151515);
 
   @override
   void dispose() {
@@ -142,7 +112,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     });
   }
 
-
   void _handleSubmit() {
     if (!_validateRequired()) {
       ScaffoldMessenger.of(context)
@@ -176,7 +145,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // final surfaceColor = theme.colorScheme.surface;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -210,33 +178,32 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                               icon: Icons.help_outline_rounded,
                               semanticLabel: 'Help',
                               onTap: () => showDialog(
-  context: context,
-  builder: (_) => AlertDialog(
-    title: const Text('How to report'),
-    content: RichText(
-      text: const TextSpan(
-        style: TextStyle(color: Colors.black87),
-        children: [
-          TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-          TextSpan(text: 'Add photo, video or voice note.\n\n'),
-          TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-          TextSpan(text: 'Confirm your location (GPS, map, or manual entry).\n\n'),
-          TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-          TextSpan(text: 'Choose the issue type and type a short description.\n\n'),
-          TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-          TextSpan(text: 'Review the information and submit the report.'),
-        ],
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('OK')
-      )
-    ],
-  ),
-),
-
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('How to report'),
+                                  content: RichText(
+                                    text: const TextSpan(
+                                      style: TextStyle(color: Colors.black87),
+                                      children: [
+                                        TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        TextSpan(text: 'Add photo, video or voice note.\n\n'),
+                                        TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        TextSpan(text: 'Confirm your location (GPS, map, or manual entry).\n\n'),
+                                        TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        TextSpan(text: 'Choose the issue type and type a short description.\n\n'),
+                                        TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        TextSpan(text: 'Review the information and submit the report.'),
+                                      ],
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('OK')
+                                    )
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -314,7 +281,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
               ),
               if (_showOtherIssue)
                 _FieldCard(
-                  label: 'Describe “Other”',
+                  label: 'Describe "Other"',
                   child: TextField(
                     controller: _otherIssue,
                     decoration: const InputDecoration(hintText: 'Type the issue…', border: InputBorder.none),
@@ -322,19 +289,18 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                   ),
                 ),
               // Description (compulsory)
-                    _FieldCard(
-                      label: 'Description *',
-                      child: TextField(
-                        controller: _textDescription,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          hintText: 'Describe the issue in detail…',
-                          border: InputBorder.none,
-                        ),
-                        textInputAction: TextInputAction.newline,
-                      ),
-                    ),
-
+              _FieldCard(
+                label: 'Description *',
+                child: TextField(
+                  controller: _textDescription,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Describe the issue in detail…',
+                    border: InputBorder.none,
+                  ),
+                  textInputAction: TextInputAction.newline,
+                ),
+              ),
 
               // Location
               _FieldCard(
@@ -391,7 +357,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                       label: 'Submit',
                     ),
                   ),
-                  
                 ],
               ),
               const SizedBox(height: 18),
@@ -576,42 +541,6 @@ class _HoverCircleButtonState extends State<_HoverCircleButton> {
             boxShadow: _hover ? [const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))] : null,
           ),
           child: Icon(widget.icon, color: Colors.white, size: 22),
-        ),
-      ),
-    );
-  }
-}
-
-/// Icon button with subtle hover (square style)
-class _HoverIconButton extends StatefulWidget {
-  final VoidCallback onTap;
-  final IconData icon;
-  // final String? tooltip;
-  const _HoverIconButton({required this.onTap, required this.icon, });
-  @override
-  State<_HoverIconButton> createState() => _HoverIconButtonState();
-}
-
-class _HoverIconButtonState extends State<_HoverIconButton> {
-  bool _hover = false;
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(_hover ? 0.12 : 0.06),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.black12),
-            boxShadow: _hover ? [const BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))] : null,
-          ),
-          child: Icon(widget.icon, color: _indigo),
         ),
       ),
     );
@@ -814,32 +743,6 @@ class MapPickPage extends StatelessWidget {
           label: const Text('Pretend we picked a location'),
           onPressed: () => Navigator.pop(context),
         ),
-      ),
-    );
-  }
-}
-
-class _HoverDialogButton extends StatefulWidget {
-  final VoidCallback onPressed;
-  final Widget child;
-  const _HoverDialogButton({required this.onPressed, required this.child});
-  @override
-  State<_HoverDialogButton> createState() => _HoverDialogButtonState();
-}
-
-class _HoverDialogButtonState extends State<_HoverDialogButton> {
-  bool _hovering = false;
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: TextButton(
-        style: TextButton.styleFrom(
-          backgroundColor: _hovering ? _indigo.withOpacity(0.08) : Colors.transparent,
-        ),
-        onPressed: widget.onPressed,
-        child: widget.child,
       ),
     );
   }

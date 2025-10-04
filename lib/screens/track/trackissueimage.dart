@@ -1,33 +1,10 @@
 import 'package:flutter/material.dart';
-import 'correcteddashboard.dart';
-
-void main() {
-  runApp(const CivicEyeApp());
-}
-
-class CivicEyeApp extends StatelessWidget { 
-
-  const CivicEyeApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CivicEye - Track Issues',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4169E1)),
-        useMaterial3: true,
-      ),
-      home: const DashboardScreen(),
-    );
-  }
-}
+import '../dashboard/correcteddashboard.dart'; // Add this import
 
 class TrackIssuePage extends StatefulWidget {
   final IssueCardData issue;
 
   const TrackIssuePage({super.key, required this.issue});
-  // const TrackIssuePage({super.key});
 
   @override
   State<TrackIssuePage> createState() => _TrackIssuePageState();
@@ -180,11 +157,6 @@ class _TrackIssuePageState extends State<TrackIssuePage> {
                                   ),
                                 ),
                               ),
-                              // IconButton(
-                              //   icon: Icon(Icons.filter_list, color: Colors.grey[700]),
-                              //   onPressed: _showFilterOptions,
-                              // ),
-                              // const SizedBox(width: 8),
                             ],
                           ),
                         ),
@@ -270,59 +242,6 @@ class _TrackIssuePageState extends State<TrackIssuePage> {
       ),
     );
   }
-
-  // void _showFilterOptions() {
-  //   showModalBottomSheet(
-  //     context: context,
-  //     shape: const RoundedRectangleBorder(
-  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-  //     ),
-  //     builder: (context) {
-  //       return Padding(
-  //         padding: const EdgeInsets.all(20.0),
-  //         child: Column(
-  //           mainAxisSize: MainAxisSize.min,
-  //           children: [
-  //             const Text(
-  //               'Filter Options',
-  //               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-  //             ),
-  //             const SizedBox(height: 20),
-  //             _buildFilterOption('By Date', Icons.calendar_today),
-  //             _buildFilterOption('By Category', Icons.category),
-  //             _buildFilterOption('By Status', Icons.info),
-  //             _buildFilterOption('By Department', Icons.business),
-  //             const SizedBox(height: 20),
-  //             SizedBox(
-  //               width: double.infinity,
-  //               child: ElevatedButton(
-  //                 onPressed: () => Navigator.pop(context),
-  //                 style: ElevatedButton.styleFrom(
-  //                   backgroundColor: const Color(0xFF4169E1),
-  //                   foregroundColor: Colors.white,
-  //                   shape: RoundedRectangleBorder(
-  //                     borderRadius: BorderRadius.circular(10),
-  //                   ),
-  //                   padding: const EdgeInsets.symmetric(vertical: 15),
-  //                 ),
-  //                 child: const Text('Apply Filters'),
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
-
-  // Widget _buildFilterOption(String title, IconData icon) {
-  //   return ListTile(
-  //     leading: Icon(icon, color: const Color(0xFF4169E1)),
-  //     title: Text(title),
-  //     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-  //     onTap: () {},
-  //   );
-  // }
 
   List<Map<String, String>> _getFilteredComplaints() {
     List<Map<String, String>> allComplaints = [
@@ -923,3 +842,4 @@ class _TimelineStep extends StatelessWidget {
     );
   }
 }
+

@@ -1,14 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'guide.dart';
-import 'trackissueimage.dart';
-import 'issuereport.dart' as report;
-// import 'loginpage.dart';
-// import 'nearbyissue.dart'as nearby;
-
-void main() {
-  runApp(const CivicEyeApp());
-}
+import '../guide/guide.dart';
+import '../track/trackissueimage.dart';
+import '../report/issuereport.dart' as report;
 
 class CivicEyeApp extends StatelessWidget {
   const CivicEyeApp({super.key});
@@ -19,7 +13,6 @@ class CivicEyeApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'CivicEye',
       theme: ThemeData(
-        
         brightness: Brightness.light,
         scaffoldBackgroundColor: Colors.white,
         colorScheme: const ColorScheme.light(
@@ -49,7 +42,6 @@ class CivicEyeApp extends StatelessWidget {
       home: const DashboardScreen(),
     );
   }
-
 }
 
 class DashboardScreen extends StatefulWidget {
@@ -60,25 +52,26 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // Inside _DashboardScreenState
+  // small user variable to keep names consistent
+  final String _userName = 'Siddhi';
 
   void _showGuideOverlay() {
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
+  final overlay = Overlay.of(context);
+  late OverlayEntry overlayEntry;
 
-    overlayEntry = OverlayEntry(
-      builder: (context) => GuideOverlay(
-        onFinish: () {
-          overlayEntry.remove();
-        },
-      ),
-    );
+  overlayEntry = OverlayEntry(
+    builder: (context) => GuideOverlay(
+      onFinish: () {
+        overlayEntry.remove();
+      },
+    ),
+  );
 
-    overlay.insert(overlayEntry);
-  }
+  overlay.insert(overlayEntry);
+}
+
 
   int _bottomIndex = 0;
-  // int _reportedFilter = 0; // 0: All, 1: Mine, 2: Nearby
 
   // Fake numbers just for interactivity
   double resolvedPctToday = 0.62; // 62%
@@ -216,8 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => report.ReportIssuePage(
-                category:
-                    "General", // 👈 you can prefill or remove if not required
+                category: "General", // 👈 you can prefill or remove if not required
               ),
             ),
           );
@@ -238,7 +230,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.teal[800],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black),
+        border: Border.all(color: Colors.black12), // softened border
       ),
       child: Row(
         children: [
@@ -246,9 +238,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Hello, Siddhi! ',
-                  style: TextStyle(
+                Text(
+                  'Hello, $_userName! ',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -271,44 +263,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Icon(Icons.map_outlined, size: 50, color: Colors.white),
+          const Icon(Icons.map_outlined, size: 50, color: Colors.white),
         ],
       ),
     );
   }
 
   Widget _reportedSection(ColorScheme cs) {
-    // final filters = ['Mine', 'Nearby'];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
+          children: const [
+            Text(
               'Reported issues',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
-            // ToggleButtons(
-            //   borderRadius: BorderRadius.circular(12),
-            //   selectedColor: Colors.white,
-            //   color: Colors.black,
-            //   fillColor: Colors.teal,
-            //   isSelected: List.generate(
-            //     filters.length,
-            //     (i) => i == _reportedFilter,
-            //   ),
-            //   onPressed: (i) => setState(() => _reportedFilter = i),
-            //   children: filters
-            //       .map(
-            //         (e) => Padding(
-            //           padding: const EdgeInsets.symmetric(horizontal: 10),
-            //           child: Text(e),
-            //         ),
-            //       )
-            //       .toList(),
-            // ),
           ],
         ),
         const SizedBox(height: 10),
@@ -316,8 +287,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           height: 180, // give enough height for cards
           child: ListView.separated(
             scrollDirection: Axis.horizontal, // 👈 horizontal
-            physics:
-                const BouncingScrollPhysics(), // 👈 makes it scroll smoothly
+            physics: const BouncingScrollPhysics(), // 👈 makes it scroll smoothly
             itemCount: reportedIssues.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
@@ -466,8 +436,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       right: 16,
       bottom: 78,
       child: GestureDetector(
-        onTap: () =>
-            _showSnack('Showing nearby issues…'), // 👈 close onTap properly
+        onTap: () => _showSnack('Showing nearby issues…'), // 👈 close onTap properly
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
@@ -536,6 +505,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _openIssue(BuildContext context, IssueCardData data) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -592,6 +562,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _openProfileSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -600,20 +571,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             CircleAvatar(
               radius: 28,
               backgroundColor: Colors.teal,
-              child: Text('S', style: TextStyle(color: Colors.white)),
+              child: Text(_userName.isNotEmpty ? _userName[0] : 'S', style: const TextStyle(color: Colors.white)),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
-              'Siddhil',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              _userName,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
-            SizedBox(height: 6),
-            Text('Ward 12, Volunteer'),
-            SizedBox(height: 16),
+            const SizedBox(height: 6),
+            const Text('Ward 12, Volunteer'),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -884,7 +855,9 @@ class _DonutPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) {
+    return oldDelegate.value != value || oldDelegate.bgColor != bgColor || oldDelegate.fgColor != fgColor;
+  }
 }
 
 class _ReportIssueSheet extends StatefulWidget {
@@ -904,6 +877,13 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
   void initState() {
     super.initState();
     if (widget.prefill != null) _selectedType = widget.prefill!;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -935,15 +915,14 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _selectedType,
+              value: _selectedType,
               items: const [
                 DropdownMenuItem(value: 'Pothole', child: Text('Pothole')),
                 DropdownMenuItem(value: 'Water', child: Text('Water leak')),
                 DropdownMenuItem(value: 'Garbage', child: Text('Garbage')),
                 DropdownMenuItem(value: 'Lights', child: Text('Street lights')),
               ],
-              onChanged: (v) =>
-                  setState(() => _selectedType = v ?? _selectedType),
+              onChanged: (v) => setState(() => _selectedType = v ?? _selectedType),
               decoration: const InputDecoration(
                 labelText: 'Issue type',
                 border: OutlineInputBorder(),
@@ -990,8 +969,9 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
             const SizedBox(height: 14),
             FilledButton(
               onPressed: () {
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(content: Text('Issue submitted')),
                 );
               },
