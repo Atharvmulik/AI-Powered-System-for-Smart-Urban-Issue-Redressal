@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '/services/issue_service.dart'; // ADD THIS IMPORT
 
 const _indigo = Colors.indigo;
 const _green = Colors.green;
@@ -112,34 +113,51 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     });
   }
 
-  void _handleSubmit() {
+  void _handleSubmit() async {
     if (!_validateRequired()) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Please fill required fields.')));
       return;
     }
 
-    final payload = {
-      'name': _name.text,
-      'phone': _phone.text,
-      'email': _email.text,
-      'issueType': _issueType,
-      'otherIssue': _showOtherIssue ? _otherIssue.text : null,
-      'locationMode': _locationChoice,
-      'manualLocation': _showManualLocation ? _manualLocation.text : null,
-      'hasPhoto': _hasAttachmentPhoto,
-      'hasVideo': _hasAttachmentVideo,
-      'hasVoice': _hasAttachmentVoice,
-      'textDescription': _showTextDescription ? _textDescription.text : null,
-      'urgency': _urgency,
-      'createdAt': DateTime.now().toIso8601String(),
-    };
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
 
-    // Navigate to confirmation page (clean UX)
-    Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ConfirmationPage(
-              payload: payload,
-            )));
+      // Send to backend
+      final response = await IssueService.reportIssue(
+        title: _textDescription.text.split(' ').take(5).join(' '), // Short title
+        description: _textDescription.text,
+        category: _issueType ?? 'General',
+        location: _manualLocation.text.isEmpty ? 'Current Location' : _manualLocation.text,
+        reporterName: _name.text,
+        reporterPhone: _phone.text,
+        reporterEmail: _email.text.isEmpty ? null : _email.text,
+        urgency: _urgency ?? 'Medium',
+      );
+
+      // Hide loading
+      Navigator.pop(context);
+
+      // Navigate to confirmation
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ConfirmationPage(payload: response),
+        ),
+      );
+      
+    } catch (e) {
+      // Hide loading if still showing
+      Navigator.pop(context);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit issue: $e')),
+      );
+    }
   }
 
   @override
@@ -402,8 +420,8 @@ class ConfirmationPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 _kv('Type', payload['issueType'] ?? '—'),
                 _kv('Urgency', urgency),
-                if (payload['manualLocation'] != null) _kv('Location', payload['manualLocation']),
-                if (payload['textDescription'] != null) _kv('Description', payload['textDescription']),
+                if (payload['location'] != null) _kv('Location', payload['location']),
+                if (payload['description'] != null) _kv('Description', payload['description']),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,

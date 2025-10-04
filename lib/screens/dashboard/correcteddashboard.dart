@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../guide/guide.dart';
 import '../track/trackissueimage.dart';
 import '../report/issuereport.dart' as report;
+import '/services/issue_service.dart';
 
 class CivicEyeApp extends StatelessWidget {
   const CivicEyeApp({super.key});
@@ -52,29 +53,11 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // small user variable to keep names consistent
   final String _userName = 'Siddhi';
-
-  void _showGuideOverlay() {
-  final overlay = Overlay.of(context);
-  late OverlayEntry overlayEntry;
-
-  overlayEntry = OverlayEntry(
-    builder: (context) => GuideOverlay(
-      onFinish: () {
-        overlayEntry.remove();
-      },
-    ),
-  );
-
-  overlay.insert(overlayEntry);
-}
-
-
+  List<dynamic> reportedIssues = [];
+  bool isLoading = true;
   int _bottomIndex = 0;
-
-  // Fake numbers just for interactivity
-  double resolvedPctToday = 0.62; // 62%
+  double resolvedPctToday = 0.62;
 
   final categories = const [
     _IssueCategory('Pothole', Icons.traffic),
@@ -83,32 +66,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _IssueCategory('Lights', Icons.light_mode_outlined),
   ];
 
-  final reportedIssues = [
-    IssueCardData(
-      title: 'Open pothole near Gate 2',
-      type: 'Pothole',
-      urgency: 0.8,
-      distanceKm: 0.4,
-    ),
-    IssueCardData(
-      title: 'Garbage overflow at Block A',
-      type: 'Garbage',
-      urgency: 0.6,
-      distanceKm: 1.1,
-    ),
-    IssueCardData(
-      title: 'Streetlight not working',
-      type: 'Lights',
-      urgency: 0.5,
-      distanceKm: 0.7,
-    ),
-    IssueCardData(
-      title: 'Water leak opposite canteen',
-      type: 'Water',
-      urgency: 0.9,
-      distanceKm: 0.2,
-    ),
-  ];
+  void _showGuideOverlay() {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => GuideOverlay(
+        onFinish: () {
+          overlayEntry.remove();
+        },
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIssues();
+  }
+
+  void _loadIssues() async {
+    try {
+      final issues = await IssueService.getIssues();
+      if (mounted) {
+        setState(() {
+          reportedIssues = issues;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load issues: $e')),
+        );
+      }
+    }
+  }
+
+  double _getUrgencyValue(String urgency) {
+    switch (urgency.toLowerCase()) {
+      case 'high': return 0.9;
+      case 'medium': return 0.6;
+      case 'low': return 0.3;
+      default: return 0.5;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,10 +142,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () {
-              _showGuideOverlay();
-            },
-            icon: const Icon(Icons.help_outline), // Guide icon
+            onPressed: _showGuideOverlay,
+            icon: const Icon(Icons.help_outline),
           ),
           IconButton(
             onPressed: () {
@@ -209,7 +214,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => report.ReportIssuePage(
-                category: "General", // 👈 you can prefill or remove if not required
+                category: "General",
               ),
             ),
           );
@@ -219,7 +224,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Report issue'),
       ),
-
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
@@ -230,7 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.teal[800],
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black12), // softened border
+        border: Border.all(color: Colors.black12),
       ),
       child: Row(
         children: [
@@ -247,7 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   'Make your city better today',
                   style: TextStyle(color: Colors.white),
                 ),
@@ -270,43 +274,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _reportedSection(ColorScheme cs) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
+          children: [
+            const Text(
               'Reported issues',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadIssues,
             ),
           ],
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 180, // give enough height for cards
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal, // 👈 horizontal
-            physics: const BouncingScrollPhysics(), // 👈 makes it scroll smoothly
-            itemCount: reportedIssues.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final item = reportedIssues[index];
-              return _IssueCard(
-                data: item,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => TrackIssuePage(
-                        issue: item,
-                      ), // 👈 pass the tapped issue
-                    ),
-                  );
-                },
-              );
-            },
-          ),
+          height: 180,
+          child: reportedIssues.isEmpty
+              ? const Center(child: Text('No issues reported yet'))
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: reportedIssues.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final issue = reportedIssues[index];
+                    return _IssueCard(
+                      data: IssueCardData(
+                        title: issue['title'] ?? 'No title',
+                        type: issue['category'] ?? 'General',
+                        urgency: _getUrgencyValue(issue['urgency'] ?? 'medium'),
+                        distanceKm: 0.5,
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TrackIssuePage(
+                              issue: IssueCardData(
+                                title: issue['title'] ?? 'No title',
+                                type: issue['category'] ?? 'General',
+                                urgency: _getUrgencyValue(issue['urgency'] ?? 'medium'),
+                                distanceKm: 0.5,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -436,15 +460,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       right: 16,
       bottom: 78,
       child: GestureDetector(
-        onTap: () => _showSnack('Showing nearby issues…'), // 👈 close onTap properly
+        onTap: () => _showSnack('Showing nearby issues…'),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.black,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
-            children: const [
+          child: const Row(
+            children: [
               Icon(Icons.my_location, color: Colors.white),
               SizedBox(width: 8),
               Expanded(
@@ -464,7 +488,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Helpers
   Widget _quickChip(String label, IconData icon, VoidCallback onTap) {
     return ActionChip(
       avatar: Icon(icon, size: 18, color: Colors.teal.shade800),
@@ -502,63 +525,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _openIssue(BuildContext context, IssueCardData data) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.place, color: Colors.teal.shade700),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    data.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text('Type: ${data.type}'),
-            const SizedBox(height: 6),
-            Text('Distance: ${data.distanceKm.toStringAsFixed(1)} km'),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => _showSnack('Subscribed to updates'),
-                    child: const Text('Follow updates'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _showSnack('Opening directions…'),
-                    child: const Text('Get directions'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _openProfileSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -575,7 +541,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             CircleAvatar(
               radius: 28,
               backgroundColor: Colors.teal,
-              child: Text(_userName.isNotEmpty ? _userName[0] : 'S', style: const TextStyle(color: Colors.white)),
+              child: Text(
+                _userName.isNotEmpty ? _userName[0] : 'S', 
+                style: const TextStyle(color: Colors.white)
+              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -679,7 +648,8 @@ class _IssueCard extends StatelessWidget {
 
 class _UrgencyPill extends StatelessWidget {
   const _UrgencyPill({required this.value});
-  final double value; // 0..1
+  final double value;
+
   @override
   Widget build(BuildContext context) {
     Color bg;
@@ -717,7 +687,7 @@ class IssueCardData {
   });
   final String title;
   final String type;
-  final double urgency; // 0..1
+  final double urgency;
   final double distanceKm;
 }
 
@@ -732,11 +702,12 @@ class _CategoryTile extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: Colors.teal.shade100,
             border: Border.all(
-              color: Colors.blue.shade200, // 👈 ultramarine blue border
+              color: Colors.blue.shade200,
               width: 2,
             ),
             borderRadius: BorderRadius.circular(16),
@@ -759,9 +730,9 @@ class _CategoryTile extends StatelessWidget {
 }
 
 class _IssueCategory {
+  const _IssueCategory(this.title, this.icon);
   final String title;
   final IconData icon;
-  const _IssueCategory(this.title, this.icon);
 }
 
 class _ActivityItem extends StatelessWidget {
@@ -773,6 +744,7 @@ class _ActivityItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -813,7 +785,7 @@ class _DonutPainter extends CustomPainter {
     required this.bgColor,
     required this.fgColor,
   });
-  final double value; // 0..1
+  final double value;
   final Color bgColor;
   final Color fgColor;
 
@@ -836,7 +808,6 @@ class _DonutPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..color = fgColor;
 
-    // Background circle
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2,
@@ -844,7 +815,6 @@ class _DonutPainter extends CustomPainter {
       false,
       base,
     );
-    // Foreground arc
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2,
@@ -856,131 +826,8 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DonutPainter oldDelegate) {
-    return oldDelegate.value != value || oldDelegate.bgColor != bgColor || oldDelegate.fgColor != fgColor;
-  }
-}
-
-class _ReportIssueSheet extends StatefulWidget {
-  const _ReportIssueSheet(this.prefill);
-  final String? prefill;
-
-  @override
-  State<_ReportIssueSheet> createState() => _ReportIssueSheetState();
-}
-
-class _ReportIssueSheetState extends State<_ReportIssueSheet> {
-  final _titleCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  String _selectedType = 'Pothole';
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.prefill != null) _selectedType = widget.prefill!;
-  }
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                height: 5,
-                width: 48,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ),
-            ),
-            const Text(
-              'Report new issue',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _selectedType,
-              items: const [
-                DropdownMenuItem(value: 'Pothole', child: Text('Pothole')),
-                DropdownMenuItem(value: 'Water', child: Text('Water leak')),
-                DropdownMenuItem(value: 'Garbage', child: Text('Garbage')),
-                DropdownMenuItem(value: 'Lights', child: Text('Street lights')),
-              ],
-              onChanged: (v) => setState(() => _selectedType = v ?? _selectedType),
-              decoration: const InputDecoration(
-                labelText: 'Issue type',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _titleCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Short title',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descCtrl,
-              minLines: 3,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.photo_camera),
-                    label: const Text('Add photo'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.location_on_outlined),
-                    label: const Text('Use GPS'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            FilledButton(
-              onPressed: () {
-                final messenger = ScaffoldMessenger.of(context);
-                Navigator.pop(context);
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Issue submitted')),
-                );
-              },
-              child: const Text('Submit'),
-            ),
-            const SizedBox(height: 6),
-          ],
-        ),
-      ),
-    );
+    return oldDelegate.value != value || 
+           oldDelegate.bgColor != bgColor || 
+           oldDelegate.fgColor != fgColor;
   }
 }
