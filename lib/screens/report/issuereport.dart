@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import '/services/issue_service.dart'; // ADD THIS IMPORT
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import '/services/issue_service.dart'; 
+import 'dart:async'; 
 
 const _indigo = Colors.indigo;
 const _green = Colors.green;
 
-/// ====================== PAGE ======================
+
 class ReportIssuePage extends StatefulWidget {
   final String category;
 
@@ -15,7 +18,7 @@ class ReportIssuePage extends StatefulWidget {
 }
 
 class _ReportIssuePageState extends State<ReportIssuePage> {
-  // Controllers
+  
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _email = TextEditingController();
@@ -33,6 +36,12 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   bool _showOtherIssue = false;
   final bool _showManualLocation = false;
   bool _showTextDescription = false;
+  
+  // Location variables
+  double? _currentLat;
+  double? _currentLong;
+  String? _currentAddress;
+  bool _isLoadingLocation = false;
 
   // color tokens (used selectively)
   static const Color _indigo = Color(0xFF3F51B5); // main indigo
@@ -56,6 +65,169 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
         _issueType != null &&
         _textDescription.text.isNotEmpty; 
   }
+
+  // ====== LOCATION FUNCTIONALITY ======
+  Future<void> _getCurrentLocation() async {
+  setState(() {
+    _isLoadingLocation = true;
+  });
+
+  try {
+    // ✅ STEP 1: Check if location services are enabled
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      // Show dialog to enable location services
+      bool? enableService = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Location Services Disabled'),
+          content: const Text('Please enable location services to use this feature.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Enable'),
+            ),
+          ],
+        ),
+      );
+      
+      if (enableService == true) {
+        await Geolocator.openLocationSettings();
+      }
+      
+      setState(() { _isLoadingLocation = false; });
+      return;
+    }
+
+    // ✅ STEP 2: Check and request permissions with proper user prompts
+    LocationPermission permission = await Geolocator.checkPermission();
+    
+    if (permission == LocationPermission.denied) {
+      // Show permission request dialog first
+      bool? requestPermission = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Location Permission Required'),
+          content: const Text('This app needs location access to capture your current location for issue reporting.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Deny'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Allow'),
+            ),
+          ],
+        ),
+      );
+      
+      if (requestPermission != true) {
+        setState(() { _isLoadingLocation = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission is required to use this feature.')),
+        );
+        return;
+      }
+      
+      // Now request the actual permission
+      permission = await Geolocator.requestPermission();
+      
+      if (permission == LocationPermission.denied) {
+        setState(() { _isLoadingLocation = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permissions are denied. Please enable in app settings.')),
+        );
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      setState(() { _isLoadingLocation = false; });
+      
+      // Show dialog to guide user to app settings
+      bool? openSettings = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Location Permission Required'),
+          content: const Text('Location permissions are permanently denied. Please enable them in app settings.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Open Settings'),
+            ),
+          ],
+        ),
+      );
+      
+      if (openSettings == true) {
+        await Geolocator.openAppSettings();
+      }
+      return;
+    }
+
+    // ✅ STEP 3: Only now get the current position
+    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15), // Add timeout
+      ).timeout(const Duration(seconds: 20), onTimeout: () {
+        throw TimeoutException('Location request timed out');
+      });
+
+      // ✅ STEP 4: Get address from coordinates
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      ).timeout(const Duration(seconds: 10), onTimeout: () {
+        return [Placemark()]; // Return empty placemark if timeout
+      });
+
+      String address = "Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
+      
+      if (placemarks.isNotEmpty && placemarks[0].street != null) {
+        Placemark place = placemarks[0];
+        address = "${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}";
+        address = address.replaceAll(RegExp(r', ,'), ',').replaceAll(RegExp(r'^,\s*'), '');
+      }
+      
+      setState(() {
+        _currentLat = position.latitude;
+        _currentLong = position.longitude;
+        _currentAddress = address.isNotEmpty ? address : "Location: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
+        _locationChoice = _currentAddress;
+        _isLoadingLocation = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('📍 Location captured successfully!')),
+      );
+    }
+
+  } on TimeoutException catch (e) {
+    setState(() {
+      _isLoadingLocation = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Location request timed out: ${e.message}')),
+    );
+  } catch (e) {
+    setState(() {
+      _isLoadingLocation = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error getting location: $e')),
+    );
+  }
+}
 
   // ====== Handlers (stubs) ======
   void _showChoiceSheet(String title, List<String> items, Function(String) onPick) async {
@@ -83,14 +255,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     });
   }
 
-  void _showLocationMenu() {
+    void _showLocationMenu() {
     _showChoiceSheet('Location', [
       '📍 Current location',
       '🗺️ Locate on map',
-    ], (c) {
+    ], (c) async {
       if (c.contains('Current')) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('TODO: Use current GPS location')));
+        // ✅ FIXED: Ask for permissions first before capturing
+        await _getCurrentLocation();
       } else if (c.contains('map')) {
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MapPickPage()));
       }
@@ -120,6 +292,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       return;
     }
 
+    // Check if location is captured when current location is selected
+    if (_locationChoice != null && _locationChoice!.contains('Current') && _currentLat == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait for location to be captured or select another location option.')),
+      );
+      return;
+    }
+
     try {
       // Show loading
       showDialog(
@@ -128,12 +308,20 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
+      // Prepare location data for backend
+      String locationData;
+      if (_currentLat != null && _currentLong != null) {
+        locationData = '${_currentAddress ?? "Current Location"} (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})';
+      } else {
+        locationData = _manualLocation.text.isEmpty ? 'Location not specified' : _manualLocation.text;
+      }
+
       // Send to backend
       final response = await IssueService.reportIssue(
         title: _textDescription.text.split(' ').take(5).join(' '), // Short title
         description: _textDescription.text,
         category: _issueType ?? 'General',
-        location: _manualLocation.text.isEmpty ? 'Current Location' : _manualLocation.text,
+        location: locationData, // ✅ UPDATED: Includes coordinates if available
         reporterName: _name.text,
         reporterPhone: _phone.text,
         reporterEmail: _email.text.isEmpty ? null : _email.text,
@@ -325,6 +513,61 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                 label: 'Location',
                 child: _MenuTile(valueText: _locationChoice ?? 'Select location option…', onTap: _showLocationMenu),
               ),
+              
+              // ✅ NEW: Show loading when getting location
+              if (_isLoadingLocation)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const CircularProgressIndicator(strokeWidth: 2),
+                      const SizedBox(width: 12),
+                      Text('Getting your current location...', 
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue.shade800)),
+                    ],
+                  ),
+                ),
+
+              // ✅ NEW: Show captured location details
+              if (_currentLat != null && _currentLong != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, color: Colors.green.shade700, size: 18),
+                          const SizedBox(width: 8),
+                          Text('📍 Location Captured', 
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade800,
+                              )),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Address: $_currentAddress', 
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.green.shade700)),
+                      const SizedBox(height: 4),
+                      Text('Coordinates: ${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)}', 
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.green.shade700)),
+                    ],
+                  ),
+                ),
+
               if (_showManualLocation)
                 _FieldCard(
                   label: 'Enter location manually',

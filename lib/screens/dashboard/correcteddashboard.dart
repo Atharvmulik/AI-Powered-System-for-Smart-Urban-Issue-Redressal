@@ -4,6 +4,7 @@ import '../guide/guide.dart';
 import '../track/trackissueimage.dart';
 import '../report/issuereport.dart' as report;
 import '/services/issue_service.dart';
+// import '/pages/report_page.dart'; // Add this import
 
 class CivicEyeApp extends StatelessWidget {
   const CivicEyeApp({super.key});
@@ -229,49 +230,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _greetingCard(ColorScheme cs) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.teal[800],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello, $_userName! ',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.teal[800],
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.black12),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hello, $_userName! ',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Make your city better today',
-                  style: TextStyle(color: Colors.white),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _quickChip('Track', Icons.location_on, () {}),
-                    _quickChip('Nearby Issues', Icons.receipt_long, () {}),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Make your city better today',
+                style: TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _quickChip('Track', Icons.location_on, () {}),
+                  _quickChip('Nearby Issues', Icons.receipt_long, () {}),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          const Icon(Icons.map_outlined, size: 50, color: Colors.white),
-        ],
-      ),
-    );
-  }
+        ),
+        const SizedBox(width: 12),
+        const Icon(Icons.map_outlined, size: 50, color: Colors.white),
+      ],
+    ),
+  );
+}
 
   Widget _reportedSection(ColorScheme cs) {
     if (isLoading) {
