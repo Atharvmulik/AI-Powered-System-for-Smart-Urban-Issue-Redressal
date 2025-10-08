@@ -1,61 +1,79 @@
-// lib/services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
 
-  final http.Client _client = http.Client();
-  String? _authToken;
+  final String baseUrl = ApiConfig.baseUrl;
+  String? _token;
 
-  void setAuthToken(String token) {
-    _authToken = token;
+  // Set authentication token - MAKE IT ACCEPT NULLABLE STRING
+  void setToken(String? token) {  // Change String to String?
+    _token = token;
   }
 
-  Future<dynamic> get(String endpoint) async {
-    try {
-      final response = await _client.get(
-        Uri.parse(endpoint),
-        headers: _buildHeaders(),
-      );
-      return _handleResponse(response);
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
-
-  Future<dynamic> post(String endpoint, dynamic data) async {
-    try {
-      final response = await _client.post(
-        Uri.parse(endpoint),
-        headers: _buildHeaders(),
-        body: json.encode(data),
-      );
-      return _handleResponse(response);
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
-
-  Map<String, String> _buildHeaders() {
+  // Get headers with authentication
+  Map<String, String> getHeaders() {
     final headers = {
       'Content-Type': 'application/json',
     };
     
-    if (_authToken != null) {
-      headers['Authorization'] = 'Bearer $_authToken';
+    if (_token != null) {
+      headers['Authorization'] = 'Bearer $_token';
     }
     
     return headers;
   }
 
-  dynamic _handleResponse(http.Response response) {
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.body}');
+  // Generic POST method
+  Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: getHeaders(),
+        body: json.encode(data),
+      );
+      return response;
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Generic GET method
+  Future<http.Response> get(String endpoint) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: getHeaders(),
+      );
+      return response;
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Upload image method
+  Future<http.Response> uploadImage(String imagePath, String issueId) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl${ApiConfig.uploadImageEndpoint}'),
+      );
+      
+      request.headers.addAll(getHeaders());
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        imagePath,
+      ));
+      request.fields['issue_id'] = issueId;
+
+      var response = await request.send();
+      return http.Response.fromStream(response);
+    } catch (e) {
+      throw Exception('Upload error: $e');
     }
   }
 }

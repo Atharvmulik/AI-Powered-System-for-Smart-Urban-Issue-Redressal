@@ -1,48 +1,82 @@
+import 'dart:convert';
 import 'api_service.dart';
+import '../config/api_config.dart';
 
 class IssueService {
-  static const String baseUrl = 'http://10.0.2.2:3000/api'; // For Android emulator
-  
-  static final ApiService _api = ApiService();
+  final ApiService _apiService = ApiService();
 
-  // Report a new issue
-  static Future<Map<String, dynamic>> reportIssue({
+  // Report an issue
+  Future<Map<String, dynamic>> reportIssue({
     required String title,
     required String description,
     required String category,
     required String location,
-    required String reporterName,
-    required String reporterPhone,
-    String? reporterEmail,
-    String urgency = 'Medium',
+    required double latitude,
+    required double longitude,
+    String? imagePath,
   }) async {
-    final data = {
-      'title': title,
-      'description': description,
-      'category': category,
-      'location': location,
-      'reporterName': reporterName,
-      'reporterPhone': reporterPhone,
-      'reporterEmail': reporterEmail,
-      'urgency': urgency,
-      'status': 'submitted',
-    };
-    
-    return await _api.post('$baseUrl/issues', data);
+    try {
+      // First, create the issue
+      final response = await _apiService.post(
+        ApiConfig.reportIssueEndpoint,
+        {
+          'title': title,
+          'description': description,
+          'category': category,
+          'location': location,
+          'latitude': latitude,
+          'longitude': longitude,
+          'status': 'pending',
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(response.body);
+        
+        // If there's an image, upload it
+        if (imagePath != null && data['id'] != null) {
+          await _apiService.uploadImage(imagePath, data['id'].toString());
+        }
+        
+        return {'success': true, 'data': data};
+      } else {
+        final error = json.decode(response.body);
+        return {'success': false, 'error': error['detail'] ?? 'Failed to report issue'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
   }
 
   // Get all issues
-  static Future<List<dynamic>> getIssues() async {
-    return await _api.get('$baseUrl/issues');
+  Future<Map<String, dynamic>> getIssues() async {
+    try {
+      final response = await _apiService.get(ApiConfig.getIssuesEndpoint);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'error': 'Failed to fetch issues'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
   }
 
-  // Get issue by ID
-  static Future<Map<String, dynamic>> getIssueById(String id) async {
-    return await _api.get('$baseUrl/issues/$id');
-  }
+  // Get issues by user
+  Future<Map<String, dynamic>> getUserIssues() async {
+    try {
+      final response = await _apiService.get('${ApiConfig.getIssuesEndpoint}/my-issues');
 
-  // Update issue status
-  static Future<Map<String, dynamic>> updateIssueStatus(String id, String status) async {
-    return await _api.post('$baseUrl/issues/$id/status', {'status': status});
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'error': 'Failed to fetch user issues'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
   }
 }

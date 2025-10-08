@@ -5,16 +5,15 @@ class ApiConfig {
   // For Android emulator: use 10.0.2.2 to connect to localhost
   static const String baseUrl = 'http://10.0.2.2:8000';
   
-  // For iOS simulator: use localhost
-  // static const String baseUrl = 'http://localhost:8000';
-  
-  // For physical device testing: use your computer's IP address
-  // static const String baseUrl = 'http://192.168.1.100:8000'; // Replace with your IP
   
   // Authentication endpoints
-  static const String login = '$baseUrl/auth/login';
-  static const String register = '$baseUrl/auth/register';
-  static const String logout = '$baseUrl/auth/logout';
+  static const String loginEndpoint = '$baseUrl/auth/login';
+  static const String registerEndpoint = '$baseUrl/auth/register';
+  static const String logoutEndpoint = '$baseUrl/auth/logout';
+  static const String reportIssueEndpoint = '/issues/report';
+  static const String getIssuesEndpoint = '/issues';
+  static const String uploadImageEndpoint = '/upload';
+
   static const String refreshToken = '$baseUrl/auth/refresh';
   
   // User management endpoints

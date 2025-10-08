@@ -1,6 +1,5 @@
-// lib/main.dart - Enhanced version with navigation
-
 import 'package:flutter/material.dart';
+import 'screens/auth/login_page.dart'; // Add this import
 import 'pages/report_page.dart';
 import 'screens/dashboard/correcteddashboard.dart';
 
@@ -25,8 +24,9 @@ class CivicEyeApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
-      home: const DashboardScreen(),
+      home: const LoginSignupPage(), // Change this to login page
       routes: {
+        '/login': (context) => const LoginSignupPage(), // Add login route
         '/report': (context) => ReportPage(),
         '/dashboard': (context) => const DashboardScreen(),
       },
@@ -35,7 +35,7 @@ class CivicEyeApp extends StatelessWidget {
   }
 }
 
-// Optional: If you want to add a bottom navigation bar
+// Optional: Enhanced MainNavigationScreen with logout
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -48,12 +48,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
-    ReportPage(), // You can add more screens here
+    ReportPage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('CivicEye'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              // Navigate back to login page
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
+        ],
+      ),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
