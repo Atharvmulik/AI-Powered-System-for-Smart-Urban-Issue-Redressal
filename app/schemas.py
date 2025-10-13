@@ -66,16 +66,12 @@ class ReportCreate(BaseModel):
     
     user_name: str
     user_mobile: str
-    user_email: Optional[str] = None
-    
-    
+    user_email: str
     issue_type: str
     title: str
     description: str
-    
-    
-    location_lat: float
-    location_long: float
+    location_lat: float  
+    location_long: float  
     location_address: Optional[str] = None
     
     
