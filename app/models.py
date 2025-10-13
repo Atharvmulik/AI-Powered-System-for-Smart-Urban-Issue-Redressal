@@ -49,7 +49,7 @@ class Report(Base):
     # Location Information (Updated)
     location_lat = Column(Float, nullable=False)
     location_long = Column(Float, nullable=False)
-    location_address = Column(Text, nullable=True)  # Human-readable address
+    location_address = Column(Text, nullable=True)  
     
     # Media Files
     images = Column(Text, nullable=True)  # Store as JSON string or comma-separated URLs

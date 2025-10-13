@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List
 import re
 
-# Schema for user creation (Sign Up)
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -61,24 +61,24 @@ class UserLogin(BaseModel):
             raise ValueError('Password cannot be empty')
         return v
 
-# ✅ UPDATED: New schema for report creation with all fields
+
 class ReportCreate(BaseModel):
-    # User Information
+    
     user_name: str
     user_mobile: str
     user_email: Optional[str] = None
     
-    # Issue Information
+    
     issue_type: str
     title: str
     description: str
     
-    # Location Information
+    
     location_lat: float
     location_long: float
     location_address: Optional[str] = None
     
-    # Validation
+    
     @validator('user_name')
     def validate_user_name(cls, v):
         if not v or not v.strip():
@@ -136,7 +136,7 @@ class ReportCreate(BaseModel):
             raise ValueError('Longitude must be between -180 and 180')
         return v
 
-# ✅ ADDED: Schema for report response
+
 class ReportResponse(BaseModel):
     id: int
     user_name: str
@@ -159,7 +159,7 @@ class ReportResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# ✅ ADDED: Schema for report with media upload
+
 class ReportCreateWithMedia(BaseModel):
     # User Information
     user_name: str
