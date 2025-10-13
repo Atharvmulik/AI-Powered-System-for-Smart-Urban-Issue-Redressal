@@ -7,7 +7,6 @@ import 'dart:async';
 const _indigo = Colors.indigo;
 const _green = Colors.green;
 
-
 class ReportIssuePage extends StatefulWidget {
   final String category;
 
@@ -29,12 +28,11 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   // State
   String? _issueType;
   String? _locationChoice;
-  String? _urgency;
   bool _hasAttachmentPhoto = false;
   bool _hasAttachmentVideo = false;
   bool _hasAttachmentVoice = false;
   bool _showOtherIssue = false;
-  final bool _showManualLocation = false;
+  bool _showManualLocation = false;
   bool _showTextDescription = false;
   
   // Location variables
@@ -44,10 +42,10 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   bool _isLoadingLocation = false;
 
   // Service instance
-  final IssueService _issueService = IssueService(); // Add this
+  final IssueService _issueService = IssueService();
 
-  // color tokens (used selectively)
-  static const Color _indigo = Color(0xFF3F51B5); // main indigo
+  // color tokens
+  static const Color _indigo = Color(0xFF3F51B5);
   static const Color _indigoLight = Color(0xFF6F7BE6);
 
   @override
@@ -66,173 +64,193 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     return _name.text.isNotEmpty &&
         _phone.text.isNotEmpty &&
         _issueType != null &&
+        _locationChoice != null && // ✅ Location is mandatory
         _textDescription.text.isNotEmpty; 
   }
 
-  // ====== LOCATION FUNCTIONALITY ======
+  // ====== CORRECTED LOCATION FUNCTIONALITY ======
   Future<void> _getCurrentLocation() async {
-  setState(() {
-    _isLoadingLocation = true;
-  });
-
-  try {
-    // ✅ STEP 1: Check if location services are enabled
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      // Show dialog to enable location services
-      bool? enableService = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Location Services Disabled'),
-          content: const Text('Please enable location services to use this feature.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Enable'),
-            ),
-          ],
-        ),
-      );
-      
-      if (enableService == true) {
-        await Geolocator.openLocationSettings();
-      }
-      
-      setState(() { _isLoadingLocation = false; });
-      return;
-    }
-
-    // ✅ STEP 2: Check and request permissions with proper user prompts
-    LocationPermission permission = await Geolocator.checkPermission();
+    if (!mounted) return;
     
-    if (permission == LocationPermission.denied) {
-      // Show permission request dialog first
-      bool? requestPermission = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Location Permission Required'),
-          content: const Text('This app needs location access to capture your current location for issue reporting.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Deny'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Allow'),
-            ),
-          ],
-        ),
-      );
-      
-      if (requestPermission != true) {
-        setState(() { _isLoadingLocation = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission is required to use this feature.')),
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      // ✅ STEP 1: Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (!mounted) return;
+        
+        bool? enableService = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Location Services Disabled'),
+            content: const Text('Please enable location services to use this feature.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Enable'),
+              ),
+            ],
+          ),
         );
+        
+        if (enableService == true) {
+          await Geolocator.openLocationSettings();
+        }
+        
+        if (mounted) {
+          setState(() { _isLoadingLocation = false; });
+        }
         return;
       }
-      
-      // Now request the actual permission
-      permission = await Geolocator.requestPermission();
+
+      // ✅ STEP 2: Check and request permissions
+      LocationPermission permission = await Geolocator.checkPermission();
       
       if (permission == LocationPermission.denied) {
-        setState(() { _isLoadingLocation = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permissions are denied. Please enable in app settings.')),
+        if (!mounted) return;
+        
+        bool? requestPermission = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Location Permission Required'),
+            content: const Text('This app needs location access to capture your current location for issue reporting.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Deny'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Allow'),
+              ),
+            ],
+          ),
         );
+        
+        if (requestPermission != true) {
+          if (mounted) {
+            setState(() { _isLoadingLocation = false; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permission is required to use this feature.')),
+            );
+          }
+          return;
+        }
+        
+        permission = await Geolocator.requestPermission();
+        
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            setState(() { _isLoadingLocation = false; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permissions are denied. Please enable in app settings.')),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() { _isLoadingLocation = false; });
+        }
+        
+        if (!mounted) return;
+        
+        bool? openSettings = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Location Permission Required'),
+            content: const Text('Location permissions are permanently denied. Please enable them in app settings.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+        
+        if (openSettings == true) {
+          await Geolocator.openAppSettings();
+        }
         return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      setState(() { _isLoadingLocation = false; });
-      
-      // Show dialog to guide user to app settings
-      bool? openSettings = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Location Permission Required'),
-          content: const Text('Location permissions are permanently denied. Please enable them in app settings.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Open Settings'),
-            ),
-          ],
-        ),
-      );
-      
-      if (openSettings == true) {
-        await Geolocator.openAppSettings();
+      // ✅ STEP 3: Get current position
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        Position position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          )
+        ).timeout(const Duration(seconds: 20), onTimeout: () {
+          throw TimeoutException('Location request timed out');
+        });
+
+        // ✅ STEP 4: Get address from coordinates
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        ).timeout(const Duration(seconds: 10), onTimeout: () {
+          return [Placemark()];
+        });
+
+        String address = "Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
+        
+        if (placemarks.isNotEmpty && placemarks[0].street != null) {
+          Placemark place = placemarks[0];
+          address = "${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}";
+          address = address.replaceAll(RegExp(r', ,'), ',').replaceAll(RegExp(r'^,\s*'), '');
+        }
+        
+        if (mounted) {
+          setState(() {
+            _currentLat = position.latitude;
+            _currentLong = position.longitude;
+            _currentAddress = address.isNotEmpty ? address : "Location: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
+            _locationChoice = '📍 Current location';
+            _isLoadingLocation = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('📍 Location captured successfully!')),
+          );
+        }
       }
-      return;
-    }
 
-    // ✅ STEP 3: Only now get the current position
-    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15), // Add timeout
-      ).timeout(const Duration(seconds: 20), onTimeout: () {
-        throw TimeoutException('Location request timed out');
-      });
-
-      // ✅ STEP 4: Get address from coordinates
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      ).timeout(const Duration(seconds: 10), onTimeout: () {
-        return [Placemark()]; // Return empty placemark if timeout
-      });
-
-      String address = "Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
-      
-      if (placemarks.isNotEmpty && placemarks[0].street != null) {
-        Placemark place = placemarks[0];
-        address = "${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}";
-        address = address.replaceAll(RegExp(r', ,'), ',').replaceAll(RegExp(r'^,\s*'), '');
+    } on TimeoutException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location request timed out: ${e.message}')),
+        );
       }
-      
-      setState(() {
-        _currentLat = position.latitude;
-        _currentLong = position.longitude;
-        _currentAddress = address.isNotEmpty ? address : "Location: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
-        _locationChoice = _currentAddress;
-        _isLoadingLocation = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('📍 Location captured successfully!')),
-      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error getting location: $e')),
+        );
+      }
     }
-
-  } on TimeoutException catch (e) {
-    setState(() {
-      _isLoadingLocation = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Location request timed out: ${e.message}')),
-    );
-  } catch (e) {
-    setState(() {
-      _isLoadingLocation = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error getting location: $e')),
-    );
   }
-}
 
-  // ====== Handlers (stubs) ======
+  // ====== Handlers ======
   void _showChoiceSheet(String title, List<String> items, Function(String) onPick) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -258,16 +276,21 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     });
   }
 
-    void _showLocationMenu() {
+  void _showLocationMenu() {
     _showChoiceSheet('Location', [
       '📍 Current location',
       '🗺️ Locate on map',
+      '✏️ Enter manually',
     ], (c) async {
       if (c.contains('Current')) {
-        // ✅ FIXED: Ask for permissions first before capturing
         await _getCurrentLocation();
       } else if (c.contains('map')) {
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MapPickPage()));
+      } else if (c.contains('manually')) {
+        setState(() {
+          _locationChoice = '✏️ Manual location';
+          _showManualLocation = true;
+        });
       }
     });
   }
@@ -277,6 +300,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       '📸 Photo/Video (Camera)',
       '🖼️ Photo/Video (Gallery)',
       '🎤 Voice Note',
+      '📝 Text Description',
     ], (c) {
       setState(() {
         if (c.contains('Camera')) _hasAttachmentPhoto = true;
@@ -291,7 +315,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   void _handleSubmit() async {
     if (!_validateRequired()) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please fill required fields.')));
+          .showSnackBar(const SnackBar(content: Text('Please fill all required fields including location.')));
       return;
     }
 
@@ -299,6 +323,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     if (_locationChoice != null && _locationChoice!.contains('Current') && _currentLat == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please wait for location to be captured or select another location option.')),
+      );
+      return;
+    }
+
+    // Check if manual location is filled when selected
+    if (_locationChoice != null && _locationChoice!.contains('Manual') && _manualLocation.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter manual location details.')),
       );
       return;
     }
@@ -312,65 +344,76 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       );
 
       // Prepare location data for backend
-      String locationData;
+      String locationAddress;
       double latitude;
       double longitude;
       
       if (_currentLat != null && _currentLong != null) {
-        locationData = '${_currentAddress ?? "Current Location"} (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})';
+        // Using current GPS location
+        locationAddress = _currentAddress ?? "Current Location (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})";
         latitude = _currentLat!;
         longitude = _currentLong!;
-      } else {
-        locationData = _manualLocation.text.isEmpty ? 'Location not specified' : _manualLocation.text;
+      } else if (_manualLocation.text.isNotEmpty) {
+        // Using manual location
+        locationAddress = _manualLocation.text;
         latitude = 0.0; // Default values for manual location
+        longitude = 0.0;
+      } else {
+        // No location provided
+        locationAddress = 'Location not specified';
+        latitude = 0.0;
         longitude = 0.0;
       }
 
-      // ✅ FIXED: Use instance method instead of static access
+      // ✅ FIXED: Use correct field names that match backend
       final response = await _issueService.reportIssue(
-        title: _textDescription.text.split(' ').take(5).join(' '), // Short title
+        title: _textDescription.text.split(' ').take(5).join(' '),
         description: _textDescription.text,
-        category: _issueType ?? 'General',
-        location: locationData,
-        latitude: latitude, // ✅ Add required parameter
-        longitude: longitude, // ✅ Add required parameter
-        reporterName: _name.text,
-        reporterPhone: _phone.text,
-        reporterEmail: _email.text.isEmpty ? null : _email.text,
-        urgency: _urgency ?? 'Medium',
+        issueType: _issueType ?? 'Other',
+        user_name: _name.text,
+        user_mobile: _phone.text,
+        location_lat: latitude,
+        location_long: longitude,
+        user_email: _email.text.isEmpty ? null : _email.text,
+        location_address: locationAddress,
       );
 
       // Hide loading
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
 
       if (response['success']) {
         // Navigate to confirmation
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => ConfirmationPage(payload: {
-              'issueType': _issueType,
-              'urgency': _urgency ?? 'Medium',
-              'location': locationData,
-              'description': _textDescription.text,
-              'hasPhoto': _hasAttachmentPhoto,
-              'hasVideo': _hasAttachmentVideo,
-              'hasVoice': _hasAttachmentVoice,
-            }),
-          ),
-        );
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => ConfirmationPage(payload: {
+                'issueType': _issueType,
+                'location': locationAddress,
+                'description': _textDescription.text,
+                'hasPhoto': _hasAttachmentPhoto,
+                'hasVideo': _hasAttachmentVideo,
+                'hasVoice': _hasAttachmentVoice,
+              }),
+            ),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit issue: ${response['error']}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to submit issue: ${response['error']}')),
+          );
+        }
       }
       
     } catch (e) {
       // Hide loading if still showing
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit issue: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit issue: $e')),
+        );
+      }
     }
   }
 
@@ -536,11 +579,11 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
               // Location
               _FieldCard(
-                label: 'Location',
+                label: 'Location *',
                 child: _MenuTile(valueText: _locationChoice ?? 'Select location option…', onTap: _showLocationMenu),
               ),
               
-              // ✅ NEW: Show loading when getting location
+              // Show loading when getting location
               if (_isLoadingLocation)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -560,7 +603,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                   ),
                 ),
 
-              // ✅ NEW: Show captured location details
+              // Show captured location details
               if (_currentLat != null && _currentLong != null)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -596,10 +639,13 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
               if (_showManualLocation)
                 _FieldCard(
-                  label: 'Enter location manually',
+                  label: 'Enter location manually *',
                   child: TextField(
                     controller: _manualLocation,
-                    decoration: const InputDecoration(hintText: 'House no., street, landmark…', border: InputBorder.none),
+                    decoration: const InputDecoration(
+                      hintText: 'House no., street, landmark, city…', 
+                      border: InputBorder.none
+                    ),
                     maxLines: 2,
                   ),
                 ),
@@ -847,7 +893,7 @@ class _FieldCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [const BoxShadow(color: Colors.black, blurRadius: 12, offset: Offset(0, 6))],
+        boxShadow: [const BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
         border: Border.all(color: Colors.black12),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
