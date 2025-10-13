@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/auth/login_page.dart'; // Add this import
+import 'screens/auth/login_page.dart'; 
 import 'pages/report_page.dart';
 import 'screens/dashboard/correcteddashboard.dart';
 
@@ -24,9 +24,9 @@ class CivicEyeApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
-      home: const LoginSignupPage(), // Change this to login page
+      home: const LoginSignupPage(), 
       routes: {
-        '/login': (context) => const LoginSignupPage(), // Add login route
+        '/login': (context) => const LoginSignupPage(),
         '/report': (context) => ReportPage(),
         '/dashboard': (context) => const DashboardScreen(),
       },
@@ -35,7 +35,7 @@ class CivicEyeApp extends StatelessWidget {
   }
 }
 
-// Optional: Enhanced MainNavigationScreen with logout
+
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -60,7 +60,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
-              // Navigate back to login page
+              
               Navigator.pushReplacementNamed(context, '/login');
             },
           ),

@@ -43,6 +43,9 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   String? _currentAddress;
   bool _isLoadingLocation = false;
 
+  // Service instance
+  final IssueService _issueService = IssueService(); // Add this
+
   // color tokens (used selectively)
   static const Color _indigo = Color(0xFF3F51B5); // main indigo
   static const Color _indigoLight = Color(0xFF6F7BE6);
@@ -310,18 +313,27 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
       // Prepare location data for backend
       String locationData;
+      double latitude;
+      double longitude;
+      
       if (_currentLat != null && _currentLong != null) {
         locationData = '${_currentAddress ?? "Current Location"} (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})';
+        latitude = _currentLat!;
+        longitude = _currentLong!;
       } else {
         locationData = _manualLocation.text.isEmpty ? 'Location not specified' : _manualLocation.text;
+        latitude = 0.0; // Default values for manual location
+        longitude = 0.0;
       }
 
-      // Send to backend
-      final response = await IssueService.reportIssue(
+      // ✅ FIXED: Use instance method instead of static access
+      final response = await _issueService.reportIssue(
         title: _textDescription.text.split(' ').take(5).join(' '), // Short title
         description: _textDescription.text,
         category: _issueType ?? 'General',
-        location: locationData, // ✅ UPDATED: Includes coordinates if available
+        location: locationData,
+        latitude: latitude, // ✅ Add required parameter
+        longitude: longitude, // ✅ Add required parameter
         reporterName: _name.text,
         reporterPhone: _phone.text,
         reporterEmail: _email.text.isEmpty ? null : _email.text,
@@ -331,12 +343,26 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       // Hide loading
       Navigator.pop(context);
 
-      // Navigate to confirmation
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => ConfirmationPage(payload: response),
-        ),
-      );
+      if (response['success']) {
+        // Navigate to confirmation
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ConfirmationPage(payload: {
+              'issueType': _issueType,
+              'urgency': _urgency ?? 'Medium',
+              'location': locationData,
+              'description': _textDescription.text,
+              'hasPhoto': _hasAttachmentPhoto,
+              'hasVideo': _hasAttachmentVideo,
+              'hasVoice': _hasAttachmentVoice,
+            }),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit issue: ${response['error']}')),
+        );
+      }
       
     } catch (e) {
       // Hide loading if still showing

@@ -60,6 +60,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _bottomIndex = 0;
   double resolvedPctToday = 0.62;
 
+  // ✅ ADD THIS: Create IssueService instance
+  final IssueService _issueService = IssueService();
+
   final categories = const [
     _IssueCategory('Pothole', Icons.traffic),
     _IssueCategory('Water', Icons.water_drop),
@@ -81,7 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     overlay.insert(overlayEntry);
   }
-
+  
   @override
   void initState() {
     super.initState();
@@ -90,10 +93,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _loadIssues() async {
     try {
-      final issues = await IssueService.getIssues();
+      // ✅ FIXED: Use instance method instead of static access
+      final response = await _issueService.getIssues();
+      
       if (mounted) {
         setState(() {
-          reportedIssues = issues;
+          if (response['success']) {
+            reportedIssues = response['data'] ?? [];
+          } else {
+            // Handle error case
+            reportedIssues = [];
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to load issues: ${response['error']}')),
+            );
+          }
           isLoading = false;
         });
       }
@@ -101,6 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() {
           isLoading = false;
+          reportedIssues = [];
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load issues: $e')),

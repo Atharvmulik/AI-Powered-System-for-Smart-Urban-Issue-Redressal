@@ -11,8 +11,12 @@ class IssueService {
     required String description,
     required String category,
     required String location,
-    required double latitude,
-    required double longitude,
+    required double latitude,    // Add this
+    required double longitude,   // Add this
+    String? reporterName,        // Add this
+    String? reporterPhone,       // Add this
+    String? reporterEmail,       // Add this
+    String? urgency,             // Add this
     String? imagePath,
   }) async {
     try {
@@ -24,29 +28,33 @@ class IssueService {
           'description': description,
           'category': category,
           'location': location,
-          'latitude': latitude,
-          'longitude': longitude,
+          'latitude': latitude,      // Include in API call
+          'longitude': longitude,    // Include in API call
+          'reporter_name': reporterName,
+          'reporter_phone': reporterPhone,
+          'reporter_email': reporterEmail,
+          'urgency': urgency,
           'status': 'pending',
         },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = json.decode(response.body);
-        
-        // If there's an image, upload it
-        if (imagePath != null && data['id'] != null) {
-          await _apiService.uploadImage(imagePath, data['id'].toString());
-        }
-        
-        return {'success': true, 'data': data};
-      } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'error': error['detail'] ?? 'Failed to report issue'};
+       if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = json.decode(response.body);
+      
+      // If there's an image, upload it
+      if (imagePath != null && data['id'] != null) {
+        await _apiService.uploadImage(imagePath, data['id'].toString());
       }
-    } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      
+      return {'success': true, 'data': data};
+    } else {
+      final error = json.decode(response.body);
+      return {'success': false, 'error': error['detail'] ?? 'Failed to report issue'};
     }
+  } catch (e) {
+    return {'success': false, 'error': e.toString()};
   }
+}
 
   // Get all issues
   Future<Map<String, dynamic>> getIssues() async {
