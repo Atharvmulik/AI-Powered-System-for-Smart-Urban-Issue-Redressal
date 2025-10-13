@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '/services/auth_service.dart'; // Add this import
+import '/services/auth_service.dart';
 
 class LoginSignupPage extends StatefulWidget {
   const LoginSignupPage({super.key});
@@ -15,32 +15,32 @@ class _LoginSignupPageState extends State<LoginSignupPage>
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController nameController = TextEditingController(); // ✅ ADDED
+  final TextEditingController phoneController = TextEditingController(); // ✅ ADDED
 
   String selectedRole = 'Citizen';
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-  bool _isLoading = false; // Add loading state
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Animation for pop-up effect
-    _controller =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 250));
-    _scaleAnimation =
-        Tween<double>(begin: 0.95, end: 1.05).animate(CurvedAnimation(
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 250));
+    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeInOut,
     ));
-    _controller.forward(); // Start animation
+    _controller.forward();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    nameController.dispose(); // ✅ ADDED
+    phoneController.dispose(); // ✅ ADDED
     super.dispose();
   }
 
@@ -51,7 +51,6 @@ class _LoginSignupPageState extends State<LoginSignupPage>
     _controller.forward(from: 0.0);
   }
 
-  // Add this method for API call
   Future<void> _handleAuth() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -75,7 +74,8 @@ class _LoginSignupPageState extends State<LoginSignupPage>
           result = await authService.register(
             emailController.text.trim(),
             passwordController.text,
-            selectedRole,
+            nameController.text.trim(), // ✅ ADDED
+            phoneController.text.trim(), // ✅ ADDED
           );
         }
 
@@ -86,7 +86,6 @@ class _LoginSignupPageState extends State<LoginSignupPage>
               backgroundColor: Colors.green,
             )
           );
-          // Navigate to dashboard after successful auth
           Navigator.pushReplacementNamed(context, '/dashboard');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -113,7 +112,7 @@ class _LoginSignupPageState extends State<LoginSignupPage>
 
   @override
   Widget build(BuildContext context) {
-    const tealColor = Color(0xFF006D5B); // darker teal
+    const tealColor = Color(0xFF006D5B);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -153,7 +152,7 @@ class _LoginSignupPageState extends State<LoginSignupPage>
                   ),
                   const SizedBox(height: 30),
 
-                  // Toggle Tabs (Rounded with Hover)
+                  // Toggle Tabs
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -185,6 +184,54 @@ class _LoginSignupPageState extends State<LoginSignupPage>
                     key: _formKey,
                     child: Column(
                       children: [
+                        // ✅ ADDED: Name Field (only for signup)
+                        if (!isLogin) ...[
+                          TextFormField(
+                            controller: nameController,
+                            decoration: InputDecoration(
+                              labelText: "Full Name",
+                              prefixIcon: const Icon(Icons.person_outline),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (!isLogin && (value == null || value.isEmpty)) {
+                                return "Please enter your full name";
+                              }
+                              if (!isLogin && value!.length < 2) {
+                                return "Name must be at least 2 characters";
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 15),
+                          
+                          // ✅ ADDED: Phone Field (only for signup)
+                          TextFormField(
+                            controller: phoneController,
+                            decoration: InputDecoration(
+                              labelText: "Phone Number",
+                              prefixIcon: const Icon(Icons.phone_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.phone,
+                            validator: (value) {
+                              if (!isLogin && (value == null || value.isEmpty)) {
+                                return "Please enter your phone number";
+                              }
+                              if (!isLogin && !RegExp(r'^\d{10}$').hasMatch(value!)) {
+                                return "Phone must be 10 digits";
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 15),
+                        ],
+
+                        // Email Field
                         TextFormField(
                           controller: emailController,
                           decoration: InputDecoration(
@@ -206,6 +253,8 @@ class _LoginSignupPageState extends State<LoginSignupPage>
                           },
                         ),
                         const SizedBox(height: 15),
+                        
+                        // Password Field
                         TextFormField(
                           controller: passwordController,
                           decoration: InputDecoration(
@@ -227,51 +276,25 @@ class _LoginSignupPageState extends State<LoginSignupPage>
                           },
                         ),
 
+                        // Confirm Password (only for signup)
                         if (!isLogin) ...[
                           const SizedBox(height: 15),
                           TextFormField(
                             controller: confirmPasswordController,
                             decoration: InputDecoration(
                               labelText: "Confirm Password",
-                              prefixIcon:
-                                  const Icon(Icons.lock_person_outlined),
+                              prefixIcon: const Icon(Icons.lock_person_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             obscureText: true,
                             validator: (value) {
-                              if (value == null || value.isEmpty) {
+                              if (!isLogin && (value == null || value.isEmpty)) {
                                 return "Please confirm your password";
                               }
-                              if (value != passwordController.text) {
+                              if (!isLogin && value != passwordController.text) {
                                 return "Passwords do not match";
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 15),
-                          DropdownButtonFormField<String>(
-                            value: selectedRole,
-                            decoration: InputDecoration(
-                              labelText: "Role",
-                              prefixIcon: const Icon(Icons.person_outline),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                  value: 'Citizen', child: Text('Citizen')),
-                              DropdownMenuItem(
-                                  value: 'Admin', child: Text('Admin')),
-                            ],
-                            onChanged: (value) {
-                              setState(() => selectedRole = value!);
-                            },
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return "Please select a role";
                               }
                               return null;
                             },
@@ -283,7 +306,7 @@ class _LoginSignupPageState extends State<LoginSignupPage>
 
                   const SizedBox(height: 25),
 
-                  // Submit Button - UPDATED WITH API CALL
+                  // Submit Button
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
@@ -294,7 +317,7 @@ class _LoginSignupPageState extends State<LoginSignupPage>
                       elevation: 4,
                       shadowColor: tealColor.withOpacity(0.4),
                     ),
-                    onPressed: _isLoading ? null : _handleAuth, // Disable when loading
+                    onPressed: _isLoading ? null : _handleAuth,
                     child: _isLoading
                         ? const SizedBox(
                             height: 20,
@@ -311,12 +334,11 @@ class _LoginSignupPageState extends State<LoginSignupPage>
                           ),
                   ),
 
-                  // Add forgot password link for login
+                  // Forgot Password Link
                   if (isLogin) ...[
                     const SizedBox(height: 15),
                     TextButton(
                       onPressed: _isLoading ? null : () {
-                        // TODO: Implement forgot password
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text("Forgot password feature coming soon!"))
                         );
@@ -343,11 +365,10 @@ class _LoginSignupPageState extends State<LoginSignupPage>
       onEnter: (_) => _controller.forward(),
       onExit: (_) => _controller.reverse(),
       child: GestureDetector(
-        onTap: _isLoading ? null : () => toggleTab(loginTab), // Disable when loading
+        onTap: _isLoading ? null : () => toggleTab(loginTab),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
           decoration: BoxDecoration(
             color: isActive ? tealColor : Colors.grey[200],
             borderRadius: BorderRadius.circular(25),

@@ -13,12 +13,12 @@ class AuthService {
         {
           'email': email,
           'password': password,
+          'is_admin': false, // ✅ ADDED
         },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        // Store token for future requests
         if (data['access_token'] != null) {
           _apiService.setToken(data['access_token']);
         }
@@ -28,15 +28,16 @@ class AuthService {
         return {'success': false, 'error': error['detail'] ?? 'Login failed'};
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()}; // Fixed
+      return {'success': false, 'error': e.toString()};
     }
   }
 
-  // Register user
+  // Register user - ✅ UPDATED with name and phone
   Future<Map<String, dynamic>> register(
     String email, 
     String password, 
-    String role
+    String fullName, // ✅ ADDED
+    String mobileNumber, // ✅ ADDED
   ) async {
     try {
       final response = await _apiService.post(
@@ -44,7 +45,9 @@ class AuthService {
         {
           'email': email,
           'password': password,
-          'role': role.toLowerCase(),
+          'full_name': fullName, // ✅ ADDED
+          'mobile_number': mobileNumber, // ✅ ADDED
+          'is_admin': false, // ✅ ADDED
         },
       );
 
@@ -56,12 +59,12 @@ class AuthService {
         return {'success': false, 'error': error['detail'] ?? 'Registration failed'};
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString()}; // Fixed
+      return {'success': false, 'error': e.toString()};
     }
   }
 
   // Logout user
   void logout() {
-    _apiService.setToken(null); // This will work now
+    _apiService.setToken(null);
   }
 }

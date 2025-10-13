@@ -7,11 +7,12 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
+  // ✅ This should be correct
   final String baseUrl = ApiConfig.baseUrl;
   String? _token;
 
-  // Set authentication token - MAKE IT ACCEPT NULLABLE STRING
-  void setToken(String? token) {  // Change String to String?
+  // Set authentication token
+  void setToken(String? token) {
     _token = token;
   }
 
@@ -31,8 +32,11 @@ class ApiService {
   // Generic POST method
   Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
     try {
+      final url = '$baseUrl$endpoint'; // This will now work correctly
+      print('🌐 Making request to: $url'); // For debugging
+      
       final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
+        Uri.parse(url),
         headers: getHeaders(),
         body: json.encode(data),
       );
@@ -45,8 +49,11 @@ class ApiService {
   // Generic GET method
   Future<http.Response> get(String endpoint) async {
     try {
+      final url = '$baseUrl$endpoint';
+      print('🌐 Making request to: $url'); // Add this for debugging
+      
       final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
+        Uri.parse(url),
         headers: getHeaders(),
       );
       return response;

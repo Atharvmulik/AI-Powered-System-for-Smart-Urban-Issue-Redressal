@@ -1,55 +1,50 @@
-// lib/config/api_config.dart
-
 class ApiConfig {
-  // Base URL for API requests
-  // For Android emulator: use 10.0.2.2 to connect to localhost
   static const String baseUrl = 'http://10.0.2.2:8000';
   
-  
-  // Authentication endpoints
-  static const String loginEndpoint = '$baseUrl/auth/login';
-  static const String registerEndpoint = '$baseUrl/auth/register';
-  static const String logoutEndpoint = '$baseUrl/auth/logout';
-  static const String reportIssueEndpoint = '/issues/report';
-  static const String getIssuesEndpoint = '/issues';
+  // ✅ CORRECTED: Use the exact endpoints from your backend
+  static const String loginEndpoint = '/login';
+  static const String registerEndpoint = '/signup'; 
+  static const String logoutEndpoint = '/logout';
+  static const String reportIssueEndpoint = '/reports/';
+  static const String getIssuesEndpoint = '/reports/';
   static const String uploadImageEndpoint = '/upload';
+  static const String getUserIssuesEndpoint = '/users/me/reports';
 
-  static const String refreshToken = '$baseUrl/auth/refresh';
+  // Remove or update these if not used
+  static const String refreshToken = '/refresh';
   
   // User management endpoints
-  static const String users = '$baseUrl/api/users';
-  static const String userProfile = '$baseUrl/api/users/profile';
+  static const String users = '/api/users';
+  static const String userProfile = '/api/users/profile';
   
   // Issue management endpoints
-  static const String issues = '$baseUrl/api/issues';
-  static String issueById(int id) => '$baseUrl/api/issues/$id';
-  static const String issuesByStatus = '$baseUrl/api/issues/status';
-  static const String issuesByCategory = '$baseUrl/api/issues/category';
+  static const String issues = '/api/issues';
+  static String issueById(int id) => '/api/issues/$id';
+  static const String issuesByStatus = '/api/issues/status';
+  static const String issuesByCategory = '/api/issues/category';
   
   // AI Prediction endpoint
-  static const String predict = '$baseUrl/api/predict';
+  static const String predict = '/api/predict';
   
   // Categories and statuses
-  static const String categories = '$baseUrl/api/categories';
-  static const String statuses = '$baseUrl/api/statuses';
+  static const String categories = '/api/categories';
+  static const String statuses = '/api/statuses';
   
   // Statistics and analytics
-  static const String statsOverview = '$baseUrl/api/stats/overview';
-  static const String statsTimeline = '$baseUrl/api/stats/timeline';
+  static const String statsOverview = '/api/stats/overview';
+  static const String statsTimeline = '/api/stats/timeline';
   
   // Image upload endpoint
-  static const String uploadImage = '$baseUrl/api/upload';
+  static const String uploadImage = '/api/upload';
   
   // Timeout settings
-  static const int connectTimeout = 5000; // 5 seconds
-  static const int receiveTimeout = 15000; // 15 seconds
+  static const int connectTimeout = 5000;
+  static const int receiveTimeout = 15000;
   
-  // Get the appropriate base URL based on platform
   static String getBaseUrl() {
     return baseUrl;
   }
   
-  // Check if we're using a local development server
   static bool isLocalServer() {
     return baseUrl.contains('localhost') || 
            baseUrl.contains('10.0.2.2') || 
