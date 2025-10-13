@@ -252,9 +252,15 @@ async def read_reports(
 async def create_report(
     report_data: ReportCreate,
     db: AsyncSession = Depends(get_db)
-    # ❌ REMOVED: current_user: User = Depends(get_current_user)
 ):
     try:
+        # ✅ ADDED: Validate location data
+        if not report_data.location_lat or not report_data.location_long:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Location coordinates are required"
+            )
+
         # AI MAGIC: Predict the category automatically!
         predicted_category = predict_category(report_data.description)
         
@@ -269,34 +275,26 @@ async def create_report(
         
         # Get the default status
         result = await db.execute(select(Status).filter(Status.name == "Reported"))
-        status = result.scalar_one_or_none()
-        if not status:
-            status = Status(name="Reported", description="Issue has been reported")
-            db.add(status)
+        status_obj = result.scalar_one_or_none()  # ✅ CHANGED: Renamed to avoid conflict
+        if not status_obj:
+            status_obj = Status(name="Reported", description="Issue has been reported")
+            db.add(status_obj)
             await db.commit()
-            await db.refresh(status)
+            await db.refresh(status_obj)
         
-        
+        # Create report
         db_report = Report(
-            
             user_name=report_data.user_name,
             user_mobile=report_data.user_mobile,
             user_email=report_data.user_email,
-            
-            
             issue_type=report_data.issue_type,
             title=report_data.title,
             description=report_data.description,
-            
-            
             location_lat=report_data.location_lat,
             location_long=report_data.location_long,
             location_address=report_data.location_address,
-            
-            # Relationships
             category_id=category.id,
-            status_id=status.id,
-            # user_id is NULL for anonymous submissions
+            status_id=status_obj.id,  # ✅ CHANGED: Use the renamed variable
         )
         
         db.add(db_report)
@@ -307,10 +305,12 @@ async def create_report(
             "message": "Report created successfully!",
             "report_id": db_report.id,
             "ai_predicted_category": predicted_category,
-            "issue_type": report_data.issue_type
+            "issue_type": report_data.issue_type,
+            "location_provided": True  # ✅ ADDED: Confirm location was saved
         }
         
-        
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(
