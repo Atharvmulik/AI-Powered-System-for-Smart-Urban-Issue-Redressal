@@ -20,7 +20,7 @@ from app.auth_utils import get_password_hash, verify_password, create_access_tok
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# ✅ ADDED: Enhanced Pydantic models for validation
+
 class UserCreateEnhanced(BaseModel):
     email: EmailStr
     password: str
@@ -173,18 +173,15 @@ async def get_current_admin(current_user: User = Depends(get_current_user)):
         )
     return current_user
 
-# Basic health check endpoint
+
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to the Smart Urban Issue Redressal API"}
 
-# Database initialization endpoint
+
 @app.post("/init-db")
 async def initialize_database(db: AsyncSession = Depends(get_db)):
-    """
-    Initialize the database with default categories and statuses.
-    This should only be run once when setting up the application.
-    """
+    
     try:
         # Create default categories if they don't exist
         categories = [
@@ -201,7 +198,7 @@ async def initialize_database(db: AsyncSession = Depends(get_db)):
             if not existing_category:
                 db.add(category)
         
-        # Create default statuses if they don't exist
+        
         statuses = [
             Status(name="Reported", description="Issue has been reported"),
             Status(name="In Progress", description="Issue is being addressed"),
@@ -215,7 +212,7 @@ async def initialize_database(db: AsyncSession = Depends(get_db)):
             if not existing_status:
                 db.add(status)
         
-        # Create admin user if it doesn't exist
+        
         result = await db.execute(select(User).filter(User.email == "admin@urbanissues.com"))
         admin_user_exists = result.scalar_one_or_none()
         if not admin_user_exists:
@@ -239,7 +236,7 @@ async def initialize_database(db: AsyncSession = Depends(get_db)):
             detail=f"Error initializing database: {str(e)}"
         )
 
-# Endpoint to get all reports
+
 @app.get("/reports/", response_model=List[dict])
 async def read_reports(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
@@ -250,7 +247,7 @@ async def read_reports(
     reports = result.scalars().all()
     return reports
 
-# ✅ FIXED: Remove authentication for anonymous report submission
+
 @app.post("/reports/")
 async def create_report(
     report_data: ReportCreate,
@@ -279,19 +276,19 @@ async def create_report(
             await db.commit()
             await db.refresh(status)
         
-        # ✅ FIXED: Create report WITHOUT user_id for anonymous submission
+        
         db_report = Report(
-            # User Information (from form)
+            
             user_name=report_data.user_name,
             user_mobile=report_data.user_mobile,
             user_email=report_data.user_email,
             
-            # Issue Information
+            
             issue_type=report_data.issue_type,
             title=report_data.title,
             description=report_data.description,
             
-            # Location Information
+            
             location_lat=report_data.location_lat,
             location_long=report_data.location_long,
             location_address=report_data.location_address,
@@ -313,15 +310,15 @@ async def create_report(
             "issue_type": report_data.issue_type
         }
         
-        # ✅ FIXED: Use status module, not Status model
+        
     except Exception as e:
         await db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,  # ← status module
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,  
             detail=f"Error creating report: {str(e)}"
         )
 
-# Get a single report by ID
+
 @app.get("/reports/{report_id}")
 async def get_report(
     report_id: int,
@@ -338,7 +335,7 @@ async def get_report(
     
     return db_report
 
-# Update a report's status
+
 @app.put("/reports/{report_id}")
 async def update_report_status(
     report_id: int, 
@@ -369,7 +366,7 @@ async def update_report_status(
     
     return {"message": f"Report {report_id} status updated to {new_status}", "report": db_report}
 
-# Delete a report
+
 @app.delete("/reports/{report_id}")
 async def delete_report(
     report_id: int, 
@@ -390,10 +387,10 @@ async def delete_report(
     
     return {"message": f"Report with ID {report_id} has been successfully deleted."}
 
-# ✅ NEW: Get available issue types
+
 @app.get("/issue-types")
 async def get_issue_types():
-    """Get all available issue types for dropdown"""
+    
     issue_types = [
         "Pothole", "Garbage", "Water Leak", "Streetlight Issue",
         "Stray Animals", "Traffic Signal", "Sewage Problem",
@@ -401,7 +398,7 @@ async def get_issue_types():
     ]
     return {"issue_types": issue_types}
 
-# ✅ CORRECTED: User Signup Endpoint with mobile_number
+
 @app.post("/signup", response_model=UserResponse)
 async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_db)):
     # Check if user already exists
@@ -413,7 +410,7 @@ async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_d
             detail="Email already registered"
         )
     
-    # Check if mobile number already exists
+    
     result = await db.execute(select(User).filter(User.mobile_number == user_data.mobile_number))
     existing_mobile = result.scalar_one_or_none()
     if existing_mobile:
@@ -422,17 +419,17 @@ async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_d
             detail="Mobile number already registered"
         )
     
-    # SECURITY: Prevent regular users from creating admin accounts
+    
     if user_data.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot self-assign admin role during signup"
         )
     
-    # Hash the password
+    
     hashed_password = get_password_hash(user_data.password)
     
-    # ✅ FIXED: Create new user WITH mobile_number
+    
     new_user = User(
         email=user_data.email,
         hashed_password=hashed_password,
@@ -447,21 +444,21 @@ async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_d
     
     return new_user
 
-# User Login Endpoint
+
 @app.post("/login")
 async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
-    # Find the user by email
+    
     result = await db.execute(select(User).filter(User.email == login_data.email))
     user = result.scalar_one_or_none()
     
-    # Check if user exists and password is correct
+    
     if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
     
-    # Check if the selected role matches the user's actual role
+    
     if user.is_admin != login_data.is_admin:
         if login_data.is_admin:
             raise HTTPException(
@@ -474,7 +471,7 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
                 detail="User access denied for this admin"
             )
     
-    # Create JWT token
+    
     access_token = create_access_token(
         data={"sub": user.email, "is_admin": user.is_admin}
     )
