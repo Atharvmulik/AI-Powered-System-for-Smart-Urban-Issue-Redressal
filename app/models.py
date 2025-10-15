@@ -1,5 +1,4 @@
-# In models.py
-from app.database import Base  # Import Base from database
+from app.database import Base
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -39,28 +38,28 @@ class Report(Base):
     # User Information (for anonymous reports)
     user_name = Column(String, nullable=False)
     user_mobile = Column(String(10), nullable=False)
-    user_email = Column(String, nullable=True)  # Optional
+    user_email = Column(String, nullable=True)
     
     # Issue Information
-    issue_type = Column(String, nullable=False)  # Pothole, Garbage, Water Leak, etc.
+    issue_type = Column(String, nullable=False)  # Now stores urgency level: High, Medium, Low
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     
-    # Location Information (Updated)
+    # Location Information
     location_lat = Column(Float, nullable=False)
     location_long = Column(Float, nullable=False)
-    location_address = Column(Text, nullable=True)  
+    location_address = Column(Text, nullable=True)
     
     # Media Files
-    images = Column(Text, nullable=True)  # Store as JSON string or comma-separated URLs
-    voice_note = Column(String, nullable=True)  # Voice note URL
+    images = Column(Text, nullable=True)
+    voice_note = Column(String, nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Foreign keys
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Optional for anonymous reports
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"))
     status_id = Column(Integer, ForeignKey("statuses.id"))
     

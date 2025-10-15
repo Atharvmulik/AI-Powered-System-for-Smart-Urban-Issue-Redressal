@@ -8,7 +8,6 @@ import json
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer
-from app.ai_model import predict_category
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import from our app
@@ -19,7 +18,6 @@ from app.schemas import UserCreate, UserResponse, UserLogin
 from app.auth_utils import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM  
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
 
 class UserCreateEnhanced(BaseModel):
     email: EmailStr
@@ -55,7 +53,7 @@ class UserLoginEnhanced(BaseModel):
     password: str
     is_admin: bool = False
 
-# ✅ ADDED: New Report Creation Schema
+# ✅ UPDATED: Report Creation Schema with Urgency Level
 class ReportCreate(BaseModel):
     # User Information
     user_name: str
@@ -63,7 +61,7 @@ class ReportCreate(BaseModel):
     user_email: Optional[str] = None
     
     # Issue Information
-    issue_type: str
+    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
     title: str
     description: str
     
@@ -87,15 +85,11 @@ class ReportCreate(BaseModel):
             raise ValueError('Mobile number must be exactly 10 digits')
         return v
 
-    @validator('issue_type')
-    def validate_issue_type(cls, v):
-        valid_issue_types = [
-            "Pothole", "Garbage", "Water Leak", "Streetlight Issue", 
-            "Stray Animals", "Traffic Signal", "Sewage Problem", 
-            "Road Damage", "Tree Fallen", "Other"
-        ]
-        if v not in valid_issue_types:
-            raise ValueError(f'Issue type must be one of: {", ".join(valid_issue_types)}')
+    @validator('urgency_level')
+    def validate_urgency_level(cls, v):
+        valid_urgency_levels = ["High", "Medium", "Low"]
+        if v not in valid_urgency_levels:
+            raise ValueError(f'Urgency level must be one of: {", ".join(valid_urgency_levels)}')
         return v
 
     @validator('title')
@@ -173,15 +167,12 @@ async def get_current_admin(current_user: User = Depends(get_current_user)):
         )
     return current_user
 
-
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to the Smart Urban Issue Redressal API"}
 
-
 @app.post("/init-db")
 async def initialize_database(db: AsyncSession = Depends(get_db)):
-    
     try:
         # Create default categories if they don't exist
         categories = [
@@ -198,7 +189,7 @@ async def initialize_database(db: AsyncSession = Depends(get_db)):
             if not existing_category:
                 db.add(category)
         
-        
+        # Create default statuses
         statuses = [
             Status(name="Reported", description="Issue has been reported"),
             Status(name="In Progress", description="Issue is being addressed"),
@@ -212,7 +203,7 @@ async def initialize_database(db: AsyncSession = Depends(get_db)):
             if not existing_status:
                 db.add(status)
         
-        
+        # Create default admin user
         result = await db.execute(select(User).filter(User.email == "admin@urbanissues.com"))
         admin_user_exists = result.scalar_one_or_none()
         if not admin_user_exists:
@@ -236,7 +227,6 @@ async def initialize_database(db: AsyncSession = Depends(get_db)):
             detail=f"Error initializing database: {str(e)}"
         )
 
-
 @app.get("/reports/", response_model=List[dict])
 async def read_reports(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
@@ -247,54 +237,51 @@ async def read_reports(
     reports = result.scalars().all()
     return reports
 
-
+# ✅ UPDATED: Report creation endpoint with urgency level
 @app.post("/reports/")
 async def create_report(
     report_data: ReportCreate,
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        # ✅ ADDED: Validate location data
+        # Validate location data
         if not report_data.location_lat or not report_data.location_long:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Location coordinates are required"
             )
 
-        # AI MAGIC: Predict the category automatically!
-        predicted_category = predict_category(report_data.description)
-        
-        # Get or create the category
-        result = await db.execute(select(Category).filter(Category.name == predicted_category))
+        # Get or create a default category (since we removed issue_type)
+        result = await db.execute(select(Category).filter(Category.name == "General"))
         category = result.scalar_one_or_none()
         if not category:
-            category = Category(name=predicted_category, description="AI-predicted category")
+            category = Category(name="General", description="General issues category")
             db.add(category)
             await db.commit()
             await db.refresh(category)
         
         # Get the default status
         result = await db.execute(select(Status).filter(Status.name == "Reported"))
-        status_obj = result.scalar_one_or_none()  # ✅ CHANGED: Renamed to avoid conflict
+        status_obj = result.scalar_one_or_none()
         if not status_obj:
             status_obj = Status(name="Reported", description="Issue has been reported")
             db.add(status_obj)
             await db.commit()
             await db.refresh(status_obj)
         
-        # Create report
+        # Create report with urgency level
         db_report = Report(
             user_name=report_data.user_name,
             user_mobile=report_data.user_mobile,
             user_email=report_data.user_email,
-            issue_type=report_data.issue_type,
+            issue_type=report_data.urgency_level,  # Store urgency as issue_type for now
             title=report_data.title,
             description=report_data.description,
             location_lat=report_data.location_lat,
             location_long=report_data.location_long,
             location_address=report_data.location_address,
             category_id=category.id,
-            status_id=status_obj.id,  # ✅ CHANGED: Use the renamed variable
+            status_id=status_obj.id,
         )
         
         db.add(db_report)
@@ -304,9 +291,8 @@ async def create_report(
         return {
             "message": "Report created successfully!",
             "report_id": db_report.id,
-            "ai_predicted_category": predicted_category,
-            "issue_type": report_data.issue_type,
-            "location_provided": True  # ✅ ADDED: Confirm location was saved
+            "urgency_level": report_data.urgency_level,
+            "location_provided": True
         }
         
     except HTTPException:
@@ -317,7 +303,6 @@ async def create_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,  
             detail=f"Error creating report: {str(e)}"
         )
-
 
 @app.get("/reports/{report_id}")
 async def get_report(
@@ -334,7 +319,6 @@ async def get_report(
         )
     
     return db_report
-
 
 @app.put("/reports/{report_id}")
 async def update_report_status(
@@ -366,7 +350,6 @@ async def update_report_status(
     
     return {"message": f"Report {report_id} status updated to {new_status}", "report": db_report}
 
-
 @app.delete("/reports/{report_id}")
 async def delete_report(
     report_id: int, 
@@ -387,17 +370,11 @@ async def delete_report(
     
     return {"message": f"Report with ID {report_id} has been successfully deleted."}
 
-
-@app.get("/issue-types")
-async def get_issue_types():
-    
-    issue_types = [
-        "Pothole", "Garbage", "Water Leak", "Streetlight Issue",
-        "Stray Animals", "Traffic Signal", "Sewage Problem",
-        "Road Damage", "Tree Fallen", "Other"
-    ]
-    return {"issue_types": issue_types}
-
+# ✅ UPDATED: Get urgency levels instead of issue types
+@app.get("/urgency-levels")
+async def get_urgency_levels():
+    urgency_levels = ["High", "Medium", "Low"]
+    return {"urgency_levels": urgency_levels}
 
 @app.post("/signup", response_model=UserResponse)
 async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_db)):
@@ -410,7 +387,7 @@ async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_d
             detail="Email already registered"
         )
     
-    
+    # Check if mobile number already exists
     result = await db.execute(select(User).filter(User.mobile_number == user_data.mobile_number))
     existing_mobile = result.scalar_one_or_none()
     if existing_mobile:
@@ -419,17 +396,17 @@ async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_d
             detail="Mobile number already registered"
         )
     
-    
+    # Prevent self-assigning admin role
     if user_data.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot self-assign admin role during signup"
         )
     
-    
+    # Hash password
     hashed_password = get_password_hash(user_data.password)
     
-    
+    # Create new user
     new_user = User(
         email=user_data.email,
         hashed_password=hashed_password,
@@ -444,21 +421,20 @@ async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_d
     
     return new_user
 
-
 @app.post("/login")
 async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
-    
+    # Find user by email
     result = await db.execute(select(User).filter(User.email == login_data.email))
     user = result.scalar_one_or_none()
     
-    
+    # Verify password
     if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
     
-    
+    # Check admin status
     if user.is_admin != login_data.is_admin:
         if login_data.is_admin:
             raise HTTPException(
@@ -471,7 +447,7 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
                 detail="User access denied for this admin"
             )
     
-    
+    # Create access token
     access_token = create_access_token(
         data={"sub": user.email, "is_admin": user.is_admin}
     )
