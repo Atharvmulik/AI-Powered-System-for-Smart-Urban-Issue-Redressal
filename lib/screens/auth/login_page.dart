@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '/services/auth_service.dart';
+import '/services/auth_service.dart'; 
 
 class LoginSignupPage extends StatefulWidget {
   const LoginSignupPage({super.key});
@@ -86,7 +86,7 @@ class _LoginSignupPageState extends State<LoginSignupPage>
               backgroundColor: Colors.green,
             )
           );
-          Navigator.pushReplacementNamed(context, '/dashboard');
+          Navigator.pushReplacementNamed(context, '/main-navigation');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

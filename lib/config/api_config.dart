@@ -21,7 +21,7 @@ class ApiConfig {
   static const String issues = '/api/issues';
   static String issueById(int id) => '/api/issues/$id';
   static const String issuesByStatus = '/api/issues/status';
-  static const String issuesByCategory = '/api/issues/category';
+  static const String urgencyLevelsEndpoint = '/urgency-levels';
   
   // AI Prediction endpoint
   static const String predict = '/api/predict';

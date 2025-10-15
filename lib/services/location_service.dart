@@ -1,11 +1,11 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:permission_handler/permission_handler.dart';
+// import 'package:permission_handler/permission_handler.dart';
 
 class LocationService {
   static Future<LocationResult> getCurrentLocation() async {
     try {
-      // ✅ STEP 1: Check if location services are enabled
+      
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         return LocationResult(
@@ -15,7 +15,7 @@ class LocationService {
         );
       }
 
-      // ✅ STEP 2: Check and request location permission
+      
       LocationPermission permission = await Geolocator.checkPermission();
       
       if (permission == LocationPermission.denied) {
@@ -37,7 +37,7 @@ class LocationService {
         );
       }
 
-      // ✅ STEP 3: Get current position
+      
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
@@ -45,7 +45,7 @@ class LocationService {
           )
         );
 
-        // ✅ STEP 4: Get address from coordinates
+        
         List<Placemark> placemarks = await placemarkFromCoordinates(
           position.latitude,
           position.longitude,
@@ -82,12 +82,12 @@ class LocationService {
     }
   }
 
-  // ✅ ADDED: Method to open app settings for permission
+  
   static Future<void> openAppSettings() async {
     await openAppSettings();
   }
 
-  // ✅ ADDED: Method to open location settings
+  
   static Future<void> openLocationSettings() async {
     await Geolocator.openLocationSettings();
   }

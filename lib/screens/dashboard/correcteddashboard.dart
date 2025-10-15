@@ -5,47 +5,6 @@ import '../track/trackissueimage.dart';
 import '../report/issuereport.dart' as report;
 import '/services/issue_service.dart';
 
-
-class CivicEyeApp extends StatelessWidget {
-  const CivicEyeApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'CivicEye',
-      theme: ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: Colors.white,
-        colorScheme: const ColorScheme.light(
-          primary: Colors.teal,
-          secondary: Colors.green,
-          surface: Colors.white,
-          onPrimary: Colors.white,
-          onSecondary: Colors.white,
-          onSurface: Colors.black,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-          centerTitle: false,
-        ),
-        chipTheme: ChipThemeData(
-          backgroundColor: Colors.teal.shade50,
-          selectedColor: Colors.teal,
-          disabledColor: Colors.grey.shade200,
-          labelStyle: const TextStyle(color: Colors.black),
-          secondaryLabelStyle: const TextStyle(color: Colors.white),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        ),
-        useMaterial3: true,
-      ),
-      home: const DashboardScreen(),
-    );
-  }
-}
-
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -60,7 +19,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _bottomIndex = 0;
   double resolvedPctToday = 0.62;
 
-  // ✅ ADD THIS: Create IssueService instance
   final IssueService _issueService = IssueService();
 
   final categories = const [
@@ -228,9 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => report.ReportIssuePage(
-                category: "General",
-              ),
+              builder: (_) => const report.ReportIssuePage(),
             ),
           );
         },
@@ -244,49 +200,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _greetingCard(ColorScheme cs) {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.teal[800],
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.black12),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hello, $_userName! ',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.teal[800],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello, $_userName! ',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Make your city better today',
-                style: TextStyle(color: Colors.white),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  _quickChip('Track', Icons.location_on, () {}),
-                  _quickChip('Nearby Issues', Icons.receipt_long, () {}),
-                ],
-              ),
-            ],
+                const SizedBox(height: 4),
+                const Text(
+                  'Make your city better today',
+                  style: TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _quickChip('Track', Icons.location_on, () {}),
+                    _quickChip('Nearby Issues', Icons.receipt_long, () {}),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        const Icon(Icons.map_outlined, size: 50, color: Colors.white),
-      ],
-    ),
-  );
-}
+          const SizedBox(width: 12),
+          const Icon(Icons.map_outlined, size: 50, color: Colors.white),
+        ],
+      ),
+    );
+  }
 
   Widget _reportedSection(ColorScheme cs) {
     if (isLoading) {
@@ -370,7 +326,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => report.ReportIssuePage(category: c.title),
+                      builder: (_) => const report.ReportIssuePage(),
                     ),
                   );
                 },

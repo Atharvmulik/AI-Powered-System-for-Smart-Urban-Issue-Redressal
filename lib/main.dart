@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'screens/auth/login_page.dart'; 
-import 'pages/report_page.dart';
+import 'screens/auth/login_page.dart';
 import 'screens/dashboard/correcteddashboard.dart';
+import 'screens/admin/admin_dashboard.dart';
 
 void main() {
   runApp(const CivicEyeApp());
@@ -13,6 +13,7 @@ class CivicEyeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'CivicEye - Urban Issue Redressal',
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -24,17 +25,36 @@ class CivicEyeApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
-      home: const LoginSignupPage(), 
+      home: const LoginSignupPage(),
       routes: {
         '/login': (context) => const LoginSignupPage(),
-        '/report': (context) => ReportPage(),
-        '/dashboard': (context) => const DashboardScreen(),
+        '/user-dashboard': (context) => const DashboardScreen(),
+        '/admin-dashboard': (context) => const AdminDashboardPage(),
+        '/main-navigation': (context) => const MainNavigationScreen(),
       },
-      debugShowCheckedModeBanner: false,
     );
   }
 }
 
+// Add this ReportPage widget if you don't have it elsewhere
+class ReportPage extends StatelessWidget {
+  const ReportPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Report Issue'),
+      ),
+      body: const Center(
+        child: Text(
+          'Report Issue Page',
+          style: TextStyle(fontSize: 24),
+        ),
+      ),
+    );
+  }
+}
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -48,7 +68,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
-    ReportPage(),
+    const ReportPage(), // Now this will work
   ];
 
   @override
@@ -60,7 +80,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
-              
               Navigator.pushReplacementNamed(context, '/login');
             },
           ),

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:image_picker/image_picker.dart';
 import '/services/issue_service.dart'; 
 import 'dart:async'; 
+import 'dart:io';
 
 const _indigo = Colors.indigo;
 const _green = Colors.green;
+const _red = Colors.red;
+const _orange = Colors.orange;
+
 
 class ReportIssuePage extends StatefulWidget {
-  final String category;
-
-  const ReportIssuePage({super.key, required this.category});
+  const ReportIssuePage({super.key});
 
   @override
   State<ReportIssuePage> createState() => _ReportIssuePageState();
@@ -21,19 +24,13 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _email = TextEditingController();
-  final _otherIssue = TextEditingController();
   final _manualLocation = TextEditingController();
   final _textDescription = TextEditingController();
 
   // State
-  String? _issueType;
+  String? _urgencyLevel;
   String? _locationChoice;
-  bool _hasAttachmentPhoto = false;
-  bool _hasAttachmentVideo = false;
-  bool _hasAttachmentVoice = false;
-  bool _showOtherIssue = false;
   bool _showManualLocation = false;
-  bool _showTextDescription = false;
   
   // Location variables
   double? _currentLat;
@@ -41,8 +38,13 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   String? _currentAddress;
   bool _isLoadingLocation = false;
 
+  // Image variables
+  File? _selectedImage;
+  bool _isUploadingImage = false;
+
   // Service instance
   final IssueService _issueService = IssueService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   // color tokens
   static const Color _indigo = Color(0xFF3F51B5);
@@ -53,7 +55,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     _name.dispose();
     _phone.dispose();
     _email.dispose();
-    _otherIssue.dispose();
     _manualLocation.dispose();
     _textDescription.dispose();
     super.dispose();
@@ -63,12 +64,12 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   bool _validateRequired() {
     return _name.text.isNotEmpty &&
         _phone.text.isNotEmpty &&
-        _issueType != null &&
-        _locationChoice != null && // ✅ Location is mandatory
-        _textDescription.text.isNotEmpty; 
+        _urgencyLevel != null &&
+        _locationChoice != null &&
+        _textDescription.text.isNotEmpty;
   }
 
-  // ====== CORRECTED LOCATION FUNCTIONALITY ======
+  // ====== LOCATION FUNCTIONALITY ======
   Future<void> _getCurrentLocation() async {
     if (!mounted) return;
     
@@ -77,7 +78,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     });
 
     try {
-      // ✅ STEP 1: Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (!mounted) return;
@@ -110,7 +110,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
         return;
       }
 
-      // ✅ STEP 2: Check and request permissions
       LocationPermission permission = await Geolocator.checkPermission();
       
       if (permission == LocationPermission.denied) {
@@ -188,7 +187,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
         return;
       }
 
-      // ✅ STEP 3: Get current position
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
@@ -198,7 +196,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
           throw TimeoutException('Location request timed out');
         });
 
-        // ✅ STEP 4: Get address from coordinates
         List<Placemark> placemarks = await placemarkFromCoordinates(
           position.latitude,
           position.longitude,
@@ -250,7 +247,76 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     }
   }
 
-  // ====== Handlers ======
+  // ====== IMAGE UPLOAD FUNCTIONALITY ======
+  Future<void> _showImageSourceDialog() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source != null) {
+      await _pickImage(source);
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+          _isUploadingImage = true;
+        });
+
+        // Simulate image processing
+        await Future.delayed(const Duration(seconds: 1));
+        
+        setState(() {
+          _isUploadingImage = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('📷 Image added successfully!')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isUploadingImage = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to pick image: $e')),
+      );
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
+
+  // ====== HANDLERS ======
   void _showChoiceSheet(String title, List<String> items, Function(String) onPick) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -260,18 +326,16 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     if (choice != null) onPick(choice);
   }
 
-  void _showIssueTypeMenu() {
-    _showChoiceSheet('Choose Issue Type', [
-      '🛣️ Pothole',
-      '🗑️ Garbage',
-      '💧 Water Leak',
-      '💡 Streetlight Issue',
-      '🐕 Stray Animals',
-      '🚧 Other',
+  void _showUrgencyMenu() {
+    _showChoiceSheet('Select Urgency Level', [
+      '🔴 High - Immediate attention required',
+      '🟡 Medium - Address within 24 hours',
+      '🟢 Low - Can be addressed later',
     ], (c) {
       setState(() {
-        _issueType = c;
-        _showOtherIssue = c.contains('Other');
+        if (c.contains('High')) _urgencyLevel = 'High';
+        else if (c.contains('Medium')) _urgencyLevel = 'Medium';
+        else if (c.contains('Low')) _urgencyLevel = 'Low';
       });
     });
   }
@@ -279,13 +343,10 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   void _showLocationMenu() {
     _showChoiceSheet('Location', [
       '📍 Current location',
-      '🗺️ Locate on map',
       '✏️ Enter manually',
     ], (c) async {
       if (c.contains('Current')) {
         await _getCurrentLocation();
-      } else if (c.contains('map')) {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MapPickPage()));
       } else if (c.contains('manually')) {
         setState(() {
           _locationChoice = '✏️ Manual location';
@@ -295,31 +356,13 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     });
   }
 
-  void _showUploadMenu() {
-    _showChoiceSheet('Upload', [
-      '📸 Photo/Video (Camera)',
-      '🖼️ Photo/Video (Gallery)',
-      '🎤 Voice Note',
-      '📝 Text Description',
-    ], (c) {
-      setState(() {
-        if (c.contains('Camera')) _hasAttachmentPhoto = true;
-        if (c.contains('Gallery')) _hasAttachmentVideo = true;
-        if (c.contains('Voice')) _hasAttachmentVoice = true;
-        if (c.contains('Text')) _showTextDescription = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Selected: $c')));
-    });
-  }
-
   void _handleSubmit() async {
     if (!_validateRequired()) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please fill all required fields including location.')));
+          .showSnackBar(const SnackBar(content: Text('Please fill all required fields.')));
       return;
     }
 
-    // Check if location is captured when current location is selected
     if (_locationChoice != null && _locationChoice!.contains('Current') && _currentLat == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please wait for location to be captured or select another location option.')),
@@ -327,7 +370,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       return;
     }
 
-    // Check if manual location is filled when selected
     if (_locationChoice != null && _locationChoice!.contains('Manual') && _manualLocation.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter manual location details.')),
@@ -336,63 +378,56 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     }
 
     try {
-      // Show loading
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Prepare location data for backend
       String locationAddress;
       double latitude;
       double longitude;
       
       if (_currentLat != null && _currentLong != null) {
-        // Using current GPS location
         locationAddress = _currentAddress ?? "Current Location (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})";
         latitude = _currentLat!;
         longitude = _currentLong!;
       } else if (_manualLocation.text.isNotEmpty) {
-        // Using manual location
         locationAddress = _manualLocation.text;
-        latitude = 0.0; // Default values for manual location
+        latitude = 0.0;
         longitude = 0.0;
       } else {
-        // No location provided
         locationAddress = 'Location not specified';
         latitude = 0.0;
         longitude = 0.0;
       }
 
-      // ✅ FIXED: Use correct field names that match backend
-      final response = await _issueService.reportIssue(
-        title: _textDescription.text.split(' ').take(5).join(' '),
-        description: _textDescription.text,
-        issueType: _issueType ?? 'Other',
-        user_name: _name.text,
-        user_mobile: _phone.text,
-        location_lat: latitude,
-        location_long: longitude,
-        user_email: _email.text.isEmpty ? null : _email.text,
-        location_address: locationAddress,
-      );
+      // Prepare report data
+      Map<String, dynamic> reportData = {
+        'user_name': _name.text,
+        'user_mobile': _phone.text,
+        'user_email': _email.text.isEmpty ? null : _email.text,
+        'urgency_level': _urgencyLevel,
+        'title': _textDescription.text.split(' ').take(5).join(' '),
+        'description': _textDescription.text,
+        'location_lat': latitude,
+        'location_long': longitude,
+        'location_address': locationAddress,
+      };
 
-      // Hide loading
+      final response = await _issueService.submitReport(reportData);
+
       if (mounted) Navigator.pop(context);
 
       if (response['success']) {
-        // Navigate to confirmation
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => ConfirmationPage(payload: {
-                'issueType': _issueType,
+                'urgency': _urgencyLevel,
                 'location': locationAddress,
                 'description': _textDescription.text,
-                'hasPhoto': _hasAttachmentPhoto,
-                'hasVideo': _hasAttachmentVideo,
-                'hasVoice': _hasAttachmentVoice,
+                'hasImage': _selectedImage != null,
               }),
             ),
           );
@@ -406,7 +441,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
       }
       
     } catch (e) {
-      // Hide loading if still showing
       if (mounted) Navigator.pop(context);
       
       if (mounted) {
@@ -414,6 +448,15 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
           SnackBar(content: Text('Failed to submit issue: $e')),
         );
       }
+    }
+  }
+
+  Color _getUrgencyColor() {
+    switch (_urgencyLevel) {
+      case 'High': return _red;
+      case 'Medium': return _orange;
+      case 'Low': return _green;
+      default: return Colors.grey;
     }
   }
 
@@ -461,13 +504,17 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                                       style: TextStyle(color: Colors.black87),
                                       children: [
                                         TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        TextSpan(text: 'Add photo, video or voice note.\n\n'),
+                                        TextSpan(text: 'Fill your contact details\n\n'),
                                         TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        TextSpan(text: 'Confirm your location (GPS, map, or manual entry).\n\n'),
+                                        TextSpan(text: 'Select urgency level\n\n'),
                                         TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        TextSpan(text: 'Choose the issue type and type a short description.\n\n'),
+                                        TextSpan(text: 'Describe the issue\n\n'),
                                         TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        TextSpan(text: 'Review the information and submit the report.'),
+                                        TextSpan(text: 'Provide location\n\n'),
+                                        TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        TextSpan(text: 'Add photo (optional)\n\n'),
+                                        TextSpan(text: '• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        TextSpan(text: 'Submit the report'),
                                       ],
                                     ),
                                   ),
@@ -495,7 +542,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('Want to report issue?',
+                              Text('Report an Issue',
                                   style: theme.textTheme.headlineSmall?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
@@ -549,21 +596,28 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                 ),
               ),
 
-              // Issue type
+              // Urgency Level
               _FieldCard(
-                label: 'Report issue *',
-                child: _MenuTile(valueText: _issueType ?? 'Choose…', onTap: _showIssueTypeMenu),
-              ),
-              if (_showOtherIssue)
-                _FieldCard(
-                  label: 'Describe "Other"',
-                  child: TextField(
-                    controller: _otherIssue,
-                    decoration: const InputDecoration(hintText: 'Type the issue…', border: InputBorder.none),
-                    maxLines: 2,
-                  ),
+                label: 'Urgency Level *',
+                child: _MenuTile(
+                  valueText: _urgencyLevel != null 
+                      ? '${_urgencyLevel!} Priority' 
+                      : 'Select urgency level…',
+                  onTap: _showUrgencyMenu,
+                  trailing: _urgencyLevel != null 
+                      ? Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: _getUrgencyColor(),
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                      : null,
                 ),
-              // Description (compulsory)
+              ),
+
+              // Description
               _FieldCard(
                 label: 'Description *',
                 child: TextField(
@@ -583,7 +637,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                 child: _MenuTile(valueText: _locationChoice ?? 'Select location option…', onTap: _showLocationMenu),
               ),
               
-              // Show loading when getting location
               if (_isLoadingLocation)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -603,7 +656,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                   ),
                 ),
 
-              // Show captured location details
               if (_currentLat != null && _currentLong != null)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -630,9 +682,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                       const SizedBox(height: 8),
                       Text('Address: $_currentAddress', 
                           style: theme.textTheme.bodySmall?.copyWith(color: Colors.green.shade700)),
-                      const SizedBox(height: 4),
-                      Text('Coordinates: ${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)}', 
-                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.green.shade700)),
                     ],
                   ),
                 ),
@@ -650,50 +699,86 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                   ),
                 ),
 
-              // Upload
+              // Image Upload
               _FieldCard(
-                label: 'Upload',
-                child: _MenuTile(valueText: 'Choose attachment…', onTap: _showUploadMenu),
-              ),
-
-              // Badges row (attachments)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                label: 'Add Photo (Optional)',
+                child: Column(
                   children: [
-                    if (_hasAttachmentPhoto) _Badge(text: 'Photo attached', icon: Icons.photo),
-                    if (_hasAttachmentVideo) _Badge(text: 'Video attached', icon: Icons.videocam),
-                    if (_hasAttachmentVoice) _Badge(text: 'Voice note attached', icon: Icons.mic),
+                    if (_selectedImage == null)
+                      ElevatedButton.icon(
+                        onPressed: _showImageSourceDialog,
+                        icon: const Icon(Icons.add_photo_alternate),
+                        label: const Text('Add Photo'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _indigo.withOpacity(0.1),
+                          foregroundColor: _indigo,
+                        ),
+                      )
+                    else
+                      Column(
+                        children: [
+                          Stack(
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 200,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  image: DecorationImage(
+                                    image: FileImage(_selectedImage!),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              if (_isUploadingImage)
+                                Positioned.fill(
+                                  child: Container(
+                                    color: Colors.black54,
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: _removeImage,
+                            icon: const Icon(Icons.delete),
+                            label: const Text('Remove Photo'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (_selectedImage == null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          'Take a photo or choose from gallery',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
                   ],
                 ),
               ),
 
-              // Text description
-              if (_showTextDescription)
-                _FieldCard(
-                  label: 'Text Description',
-                  child: TextField(
-                    controller: _textDescription,
-                    maxLines: 4,
-                    decoration: const InputDecoration(hintText: 'Describe the issue…', border: InputBorder.none),
-                  ),
-                ),
-              // CTA row: Submit + Quick action (preview)
+              // Submit Button
               Row(
                 children: [
                   Expanded(
                     child: _SubmitButton(
                       gradient: [_indigo, _indigoLight],
                       onPressed: _handleSubmit,
-                      label: 'Submit',
+                      label: 'Submit Report',
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 18),
-              // small hint
               Text(
                 '* Required fields',
                 style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
@@ -706,6 +791,10 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   }
 }
 
+// ... (Keep all the existing helper classes: ConfirmationPage, TrackIssuePage, 
+// _CurvedHeader, _HoverCircleButton, _FieldCard, _MenuTile, _ChoiceSheet, 
+// _HoverListTile, _Badge, _SubmitButton, _TimelineTile) exactly as they are from your original code
+
 /// ================= Confirmation Page =================
 class ConfirmationPage extends StatelessWidget {
   final Map payload;
@@ -714,10 +803,9 @@ class ConfirmationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    String urgency = payload['urgency']?.toString() ?? 'Unknown';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Submitted')),
+      appBar: AppBar(title: const Text('Report Submitted')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -733,19 +821,12 @@ class ConfirmationPage extends StatelessWidget {
                   Text('Issue Submitted', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 12),
-                _kv('Type', payload['issueType'] ?? '—'),
-                _kv('Urgency', urgency),
+                _kv('Urgency', payload['urgency'] ?? '—'),
                 if (payload['location'] != null) _kv('Location', payload['location']),
                 if (payload['description'] != null) _kv('Description', payload['description']),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    if (payload['hasPhoto'] == true) _Badge(text: 'Photo attached', icon: Icons.photo),
-                    if (payload['hasVideo'] == true) _Badge(text: 'Video attached', icon: Icons.videocam),
-                    if (payload['hasVoice'] == true) _Badge(text: 'Voice note', icon: Icons.mic),
-                  ],
-                ),
+                if (payload['hasImage'] == true) 
+                  _Badge(text: 'Photo attached', icon: Icons.photo),
               ]),
             ),
           ),
@@ -791,14 +872,16 @@ class TrackIssuePage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: const [
           _TimelineTile(state: 'Submitted', time: 'Just now', isDone: true),
-          _TimelineTile(state: 'Assigned to dept.', time: '—', isDone: false),
-          _TimelineTile(state: 'In progress', time: '—', isDone: false),
+          _TimelineTile(state: 'Under Review', time: '—', isDone: false),
+          _TimelineTile(state: 'In Progress', time: '—', isDone: false),
           _TimelineTile(state: 'Resolved', time: '—', isDone: false),
         ],
       ),
     );
   }
 }
+
+// ... (Include all the remaining helper classes from your original code)
 
 /// ===================== Reusable UI pieces =====================
 
@@ -909,13 +992,20 @@ class _FieldCard extends StatelessWidget {
 class _MenuTile extends StatelessWidget {
   final String valueText;
   final VoidCallback onTap;
-  const _MenuTile({required this.valueText, required this.onTap});
+  final Widget? trailing; // Add trailing parameter
+  
+  const _MenuTile({
+    required this.valueText, 
+    required this.onTap,
+    this.trailing, // Make it optional
+  });
+  
   @override
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(valueText),
-      trailing: const Icon(Icons.expand_more_rounded),
+      trailing: trailing ?? const Icon(Icons.expand_more_rounded), // Use custom trailing or default icon
       onTap: onTap,
       dense: true,
       visualDensity: VisualDensity.compact,
