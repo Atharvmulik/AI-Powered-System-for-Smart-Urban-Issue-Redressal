@@ -2,7 +2,6 @@ from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List
 import re
 
-
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -61,19 +60,17 @@ class UserLogin(BaseModel):
             raise ValueError('Password cannot be empty')
         return v
 
-
+# ✅ UPDATED: ReportCreate schema with urgency_level
 class ReportCreate(BaseModel):
-    
     user_name: str
     user_mobile: str
-    user_email: str
-    issue_type: str
+    user_email: Optional[str] = None
+    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
     title: str
     description: str
     location_lat: float  
     location_long: float  
     location_address: Optional[str] = None
-    
     
     @validator('user_name')
     def validate_user_name(cls, v):
@@ -89,15 +86,11 @@ class ReportCreate(BaseModel):
             raise ValueError('Mobile number must be exactly 10 digits')
         return v
 
-    @validator('issue_type')
-    def validate_issue_type(cls, v):
-        valid_issue_types = [
-            "Pothole", "Garbage", "Water Leak", "Streetlight Issue", 
-            "Stray Animals", "Traffic Signal", "Sewage Problem", 
-            "Road Damage", "Tree Fallen", "Other"
-        ]
-        if v not in valid_issue_types:
-            raise ValueError(f'Issue type must be one of: {", ".join(valid_issue_types)}')
+    @validator('urgency_level')
+    def validate_urgency_level(cls, v):
+        valid_urgency_levels = ["High", "Medium", "Low"]
+        if v not in valid_urgency_levels:
+            raise ValueError(f'Urgency level must be one of: {", ".join(valid_urgency_levels)}')
         return v
 
     @validator('title')
@@ -132,13 +125,12 @@ class ReportCreate(BaseModel):
             raise ValueError('Longitude must be between -180 and 180')
         return v
 
-
 class ReportResponse(BaseModel):
     id: int
     user_name: str
     user_mobile: str
     user_email: Optional[str]
-    issue_type: str
+    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
     title: str
     description: str
     location_lat: float
@@ -155,7 +147,6 @@ class ReportResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class ReportCreateWithMedia(BaseModel):
     # User Information
     user_name: str
@@ -163,7 +154,7 @@ class ReportCreateWithMedia(BaseModel):
     user_email: Optional[str] = None
     
     # Issue Information
-    issue_type: str
+    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
     title: str
     description: str
     
@@ -197,12 +188,12 @@ class TokenResponse(BaseModel):
     email: str
     message: str
 
-# ✅ ADDED: Schema for file upload response
+# Schema for file upload response
 class FileUploadResponse(BaseModel):
     filename: str
     file_url: str
     message: str
 
-# ✅ ADDED: Schema for issue types response
-class IssueTypesResponse(BaseModel):
-    issue_types: List[str]
+# ✅ ADDED: Schema for urgency levels response
+class UrgencyLevelsResponse(BaseModel):
+    urgency_levels: List[str]
