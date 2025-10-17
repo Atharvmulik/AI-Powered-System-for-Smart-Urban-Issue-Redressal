@@ -19,11 +19,36 @@ class AuthService {
     return adminEmails.contains(email.toLowerCase());
   }
 
+  // Admin login check
+  Map<String, dynamic> _checkAdminLogin(String email, String password) {
+    if (adminEmails.contains(email.toLowerCase())) {
+      if (password == 'admin123') { 
+        return {
+          'success': true,
+          'user': {
+            'email': email,
+            'name': 'Admin User',
+            'role': 'admin'
+          }
+        };
+      } else {
+        return {'success': false, 'error': 'Invalid admin password'};
+      }
+    }
+    return {'success': false, 'error': 'Not an admin email'};
+  }
+
   // Login user
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
+      // First check if it's an admin login
       final bool isAdmin = isAdminEmail(email);
+      if (isAdmin) {
+        final adminResult = _checkAdminLogin(email, password);
+        return adminResult; // Return immediately for admin users
+      }
       
+      // If not admin, proceed with API login for regular users
       final response = await _apiService.post(
         ApiConfig.loginEndpoint,
         {
@@ -40,7 +65,11 @@ class AuthService {
         return {
           'success': true, 
           'data': data, 
-          'is_admin': isAdmin // Determine admin status locally
+          'user': {
+            'email': email,
+            'name': data['full_name'] ?? 'User',
+            'role': 'user'
+          }
         };
       } else {
         final error = json.decode(response.body);
@@ -82,7 +111,11 @@ class AuthService {
         return {
           'success': true, 
           'data': data, 
-          'is_admin': false // Regular users only
+          'user': {
+            'email': email,
+            'name': fullName,
+            'role': 'user'
+          }
         };
       } else {
         final error = json.decode(response.body);
@@ -97,4 +130,4 @@ class AuthService {
   void logout() {
     _apiService.setToken(null);
   }
-}
+} 

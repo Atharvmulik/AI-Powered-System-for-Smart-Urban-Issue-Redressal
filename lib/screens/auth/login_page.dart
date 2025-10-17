@@ -79,15 +79,23 @@ class _LoginSignupPageState extends State<LoginSignupPage>
           );
         }
 
-        if (result['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isLogin ? "Login successful!" : "Account created!"),
-              backgroundColor: Colors.green,
-            )
-          );
-          Navigator.pushReplacementNamed(context, '/main-navigation');
+              if (result['success']) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                content: Text(isLogin ? "Login successful!" : "Account created!"),
+                backgroundColor: Colors.green,
+              )
+            );
+        
+        // Check if user is admin or regular user
+        final bool isAdmin = result['user']?['role'] == 'admin';
+        
+        if (isAdmin) {
+          Navigator.pushReplacementNamed(context, '/admin-dashboard');
         } else {
+          Navigator.pushReplacementNamed(context, '/main-navigation');
+        }
+      } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text("Error: ${result['error']}"),
