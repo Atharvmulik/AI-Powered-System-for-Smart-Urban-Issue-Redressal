@@ -1,21 +1,22 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import and_, func
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, validator
 import re
 import json
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
+import math
 
-# Import from our app
 from app import models
 from app.database import get_db, engine, AsyncSessionLocal
 from app.models import Report, User, Category, Status
 from app.schemas import UserCreate, UserResponse, UserLogin  
-from app.auth_utils import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM  
+from app.auth_utils import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM    
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -498,3 +499,368 @@ async def get_statuses(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Status))
     statuses = result.scalars().all()
     return statuses
+
+
+@app.get("/dashboard/summary")
+async def get_dashboard_summary(db: AsyncSession = Depends(get_db)):
+    """
+    Returns public dashboard summary (no auth required)
+    """
+    try:
+        # Get total reports in system
+        total_reports_result = await db.execute(select(func.count(Report.id)))
+        total_reports_count = total_reports_result.scalar()
+
+        # Get today's resolved issues count
+        today = date.today()
+        today_resolved_result = await db.execute(
+            select(func.count(Report.id))
+            .join(Status)
+            .filter(Status.name == "Resolved")
+            .filter(func.date(Report.updated_at) == today)
+        )
+        today_resolved_count = today_resolved_result.scalar()
+
+        # Get recent reports (public)
+        recent_reports_result = await db.execute(
+            select(Report)
+            .order_by(Report.created_at.desc())
+            .limit(5)
+        )
+        recent_reports = recent_reports_result.scalars().all()
+
+        return {
+            "message": "Welcome to CivicEye - Make your city better today",
+            "public_stats": {
+                "total_reports": total_reports_count,
+                "today_resolved": today_resolved_count,
+                "active_issues": total_reports_count - today_resolved_count
+            },
+            "recent_reports": recent_reports
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching dashboard summary: {str(e)}"
+        )
+
+@app.get("/reports/nearby")
+async def get_nearby_issues(
+    lat: float = Query(..., description="User latitude"),
+    long: float = Query(..., description="User longitude"),
+    radius_km: float = Query(5.0, description="Search radius in km"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Returns nearby issues (public - no auth required)
+    """
+    try:
+        # Haversine formula for distance calculation
+        earth_radius_km = 6371
+        
+        # Calculate bounding box for initial filtering
+        lat_range = radius_km / earth_radius_km * (180 / math.pi)
+        long_range = radius_km / (earth_radius_km * math.cos(math.radians(lat))) * (180 / math.pi)
+        
+        min_lat = lat - lat_range
+        max_lat = lat + lat_range
+        min_long = long - long_range
+        max_long = long + long_range
+        
+        # Get reports within bounding box (only unresolved issues)
+        result = await db.execute(
+            select(Report)
+            .filter(
+                and_(
+                    Report.location_lat >= min_lat,
+                    Report.location_lat <= max_lat,
+                    Report.location_long >= min_long,
+                    Report.location_long <= max_long
+                )
+            )
+            .join(Status)
+            .filter(Status.name.in_(["Reported", "In Progress"]))  # Only show active issues
+        )
+        nearby_reports = result.scalars().all()
+        
+        # Calculate exact distances and filter by radius
+        reports_with_distance = []
+        for report in nearby_reports:
+            # Haversine distance calculation
+            dlat = math.radians(report.location_lat - lat)
+            dlong = math.radians(report.location_long - long)
+            a = math.sin(dlat/2) * math.sin(dlat/2) + math.cos(math.radians(lat)) * math.cos(math.radians(report.location_lat)) * math.sin(dlong/2) * math.sin(dlong/2)
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+            distance = earth_radius_km * c
+            
+            if distance <= radius_km:
+                report_data = {
+                    "id": report.id,
+                    "title": report.title,
+                    "description": report.description,
+                    "urgency_level": report.issue_type,
+                    "category": report.category.name if report.category else "General",
+                    "status": report.status.name if report.status else "Reported",
+                    "location_lat": report.location_lat,
+                    "location_long": report.location_long,
+                    "location_address": report.location_address,
+                    "created_at": report.created_at,
+                    "distance_km": round(distance, 2)
+                }
+                reports_with_distance.append(report_data)
+        
+        return {
+            "user_location": {"lat": lat, "long": long},
+            "search_radius_km": radius_km,
+            "nearby_issues_count": len(reports_with_distance),
+            "nearby_issues": reports_with_distance
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching nearby issues: {str(e)}"
+        )
+
+@app.get("/reports/resolved/today")
+async def get_todays_resolved_issues(db: AsyncSession = Depends(get_db)):
+    """
+    Returns issues resolved today (public - no auth required)
+    """
+    try:
+        today = date.today()
+        
+        # Get resolved reports from today
+        result = await db.execute(
+            select(Report)
+            .join(Status)
+            .filter(Status.name == "Resolved")
+            .filter(func.date(Report.updated_at) == today)
+        )
+        resolved_reports = result.scalars().all()
+        
+        # Format response data
+        formatted_reports = []
+        for report in resolved_reports:
+            report_data = {
+                "id": report.id,
+                "title": report.title,
+                "description": report.description,
+                "urgency_level": report.issue_type,
+                "category": report.category.name if report.category else "General",
+                "location_address": report.location_address,
+                "resolved_at": report.updated_at
+            }
+            formatted_reports.append(report_data)
+        
+        # Get count by category
+        category_count_result = await db.execute(
+            select(Category.name, func.count(Report.id))
+            .select_from(Report)
+            .join(Category)
+            .join(Status)
+            .filter(Status.name == "Resolved")
+            .filter(func.date(Report.updated_at) == today)
+            .group_by(Category.name)
+        )
+        category_counts = category_count_result.all()
+        
+        return {
+            "date": today.isoformat(),
+            "total_resolved_today": len(resolved_reports),
+            "resolved_issues": formatted_reports,
+            "category_breakdown": [{"category": cat, "count": cnt} for cat, cnt in category_counts]
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching today's resolved issues: {str(e)}"
+        )
+
+@app.get("/activity/today")
+async def get_todays_activity(db: AsyncSession = Depends(get_db)):
+    """
+    Returns today's public activity feed (no auth required)
+    """
+    try:
+        today = date.today()
+        activities = []
+        
+        # Get new reports created today
+        new_reports_result = await db.execute(
+            select(Report)
+            .filter(func.date(Report.created_at) == today)
+            .order_by(Report.created_at.desc())
+            .limit(10)
+        )
+        new_reports = new_reports_result.scalars().all()
+        
+        for report in new_reports:
+            activities.append({
+                "type": "new_report",
+                "title": f"New {report.issue_type} issue reported",
+                "description": report.title,
+                "urgency": report.issue_type,
+                "category": report.category.name if report.category else "General",
+                "timestamp": report.created_at,
+                "location": report.location_address
+            })
+        
+        # Get issues resolved today
+        resolved_reports_result = await db.execute(
+            select(Report)
+            .join(Status)
+            .filter(Status.name == "Resolved")
+            .filter(func.date(Report.updated_at) == today)
+            .order_by(Report.updated_at.desc())
+            .limit(10)
+        )
+        resolved_reports = resolved_reports_result.scalars().all()
+        
+        for report in resolved_reports:
+            activities.append({
+                "type": "issue_resolved", 
+                "title": f"{report.issue_type} issue resolved",
+                "description": f"'{report.title}' has been fixed",
+                "category": report.category.name if report.category else "General",
+                "timestamp": report.updated_at,
+                "location": report.location_address
+            })
+        
+        # Sort activities by timestamp
+        activities.sort(key=lambda x: x["timestamp"], reverse=True)
+        
+        return {
+            "date": today.isoformat(),
+            "total_activities": len(activities),
+            "activities": activities[:15]  # Return top 15 most recent
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching today's activity: {str(e)}"
+        )
+
+@app.get("/reports/{report_id}/confirmations")
+async def get_issue_confirmations(
+    report_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get confirmation count for an issue (public - no auth required)
+    """
+    try:
+        report_result = await db.execute(select(Report).filter(Report.id == report_id))
+        report = report_result.scalar_one_or_none()
+        
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report with ID {report_id} not found"
+            )
+        
+        confirmation_count = getattr(report, 'confirmation_count', 0)
+        
+        return {
+            "report_id": report_id,
+            "title": report.title,
+            "confirmation_count": confirmation_count,
+            "confirmed_by_citizens": confirmation_count
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching confirmations: {str(e)}"
+        )
+
+@app.get("/dashboard/stats")
+async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
+    """
+    Returns public dashboard statistics (no auth required)
+    """
+    try:
+        # Total reports count
+        total_reports_result = await db.execute(select(func.count(Report.id)))
+        total_reports = total_reports_result.scalar()
+        
+        # Resolved reports count
+        resolved_reports_result = await db.execute(
+            select(func.count(Report.id))
+            .join(Status)
+            .filter(Status.name == "Resolved")
+        )
+        resolved_reports = resolved_reports_result.scalar()
+        
+        # In progress reports count
+        in_progress_result = await db.execute(
+            select(func.count(Report.id))
+            .join(Status)
+            .filter(Status.name == "In Progress")
+        )
+        in_progress_reports = in_progress_result.scalar()
+        
+        # Category-wise counts
+        category_stats_result = await db.execute(
+            select(Category.name, func.count(Report.id))
+            .select_from(Report)
+            .join(Category)
+            .group_by(Category.name)
+        )
+        category_stats = category_stats_result.all()
+        
+        # Urgency level counts
+        urgency_stats_result = await db.execute(
+            select(Report.issue_type, func.count(Report.id))
+            .group_by(Report.issue_type)
+        )
+        urgency_stats = urgency_stats_result.all()
+        
+        return {
+            "total_reports": total_reports,
+            "resolved_reports": resolved_reports,
+            "in_progress_reports": in_progress_reports,
+            "resolution_rate": round((resolved_reports / total_reports * 100) if total_reports > 0 else 0, 1),
+            "category_stats": [{"category": cat, "count": cnt} for cat, cnt in category_stats],
+            "urgency_stats": [{"urgency": urg, "count": cnt} for urg, cnt in urgency_stats]
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching dashboard stats: {str(e)}"
+        )
+
+@app.get("/reports/category-summary")
+async def get_category_summary(db: AsyncSession = Depends(get_db)):
+    """
+    Returns count of issues per category (public - no auth required)
+    """
+    try:
+        result = await db.execute(
+            select(Category.name, Category.description, func.count(Report.id))
+            .select_from(Report)
+            .join(Category)
+            .group_by(Category.name, Category.description)
+        )
+        category_summary = result.all()
+        
+        return {
+            "category_summary": [
+                {
+                    "category_name": name,
+                    "description": desc,
+                    "issue_count": count
+                }
+                for name, desc, count in category_summary
+            ]
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching category summary: {str(e)}"
+        )

@@ -30,6 +30,24 @@ class Status(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     description = Column(Text)
 
+class Confirmation(Base):
+    __tablename__ = "confirmations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(Integer, ForeignKey("reports.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    confirmed_at = Column(DateTime, default=datetime.utcnow)
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    activity_type = Column(String)  # 'report_created', 'issue_resolved', 'confirmed'
+    report_id = Column(Integer, ForeignKey("reports.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    description = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Report(Base):
     __tablename__ = "reports"
     
@@ -41,7 +59,7 @@ class Report(Base):
     user_email = Column(String, nullable=True)
     
     # Issue Information
-    issue_type = Column(String, nullable=False)  # Now stores urgency level: High, Medium, Low
+    issue_type = Column(String, nullable=False)  
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     
