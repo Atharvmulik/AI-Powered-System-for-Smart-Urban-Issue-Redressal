@@ -3,8 +3,15 @@ import '../dashboard/correcteddashboard.dart'; // Add this import
 
 class TrackIssuePage extends StatefulWidget {
   final IssueCardData issue;
+  final String userEmail;
+  final String userName;
 
-  const TrackIssuePage({super.key, required this.issue});
+  const TrackIssuePage({
+    super.key, 
+    required this.issue,
+    required this.userEmail,
+    required this.userName,
+  });
 
   @override
   State<TrackIssuePage> createState() => _TrackIssuePageState();
@@ -70,12 +77,17 @@ class _TrackIssuePageState extends State<TrackIssuePage> {
                               child: IconButton(
                                 icon: const Icon(Icons.home, color: Colors.white, size: 20),
                                 onPressed: () {
-                                  // Navigate to home page
+                                  // Navigate to home page with user data
                                   Navigator.pushAndRemoveUntil(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const DashboardScreen()),
-                                      (route) => false,
-                                    );
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => DashboardScreen(
+                                        userEmail: widget.userEmail, // Use the passed user data
+                                        userName: widget.userName,   // Use the passed user data
+                                      ),
+                                    ),
+                                    (route) => false,
+                                  );
                                 },
                               ),
                             ),

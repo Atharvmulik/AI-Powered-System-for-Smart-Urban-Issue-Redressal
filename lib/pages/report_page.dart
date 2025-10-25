@@ -33,69 +33,76 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
   }
 
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => isLoading = true);
+  setState(() => isLoading = true);
 
-    try {
-      Map<String, dynamic> result;
+  try {
+    Map<String, dynamic> result;
+    
+    if (isLogin) {
+      result = await _authService.login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+    } else {
+      result = await _authService.register(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+        _fullNameController.text.trim(),
+        _mobileController.text.trim(),
+      );
+    }
+
+    setState(() => isLoading = false);
+
+    if (result['success']) {
+      final bool isAdmin = result['is_admin'] ?? false;
       
-      if (isLogin) {
-        result = await _authService.login(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
+      // Navigate based on user type
+      if (isAdmin) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
         );
       } else {
-        result = await _authService.register(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-          _fullNameController.text.trim(),
-          _mobileController.text.trim(),
-        );
-      }
-
-      setState(() => isLoading = false);
-
-      if (result['success']) {
-        final bool isAdmin = result['is_admin'] ?? false;
-        
-        // Navigate based on user type
-        if (isAdmin) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const DashboardScreen()),
-          );
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isLogin ? 'Login successful!' : 'Registration successful!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['error']),
-            backgroundColor: Colors.red,
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardScreen(
+              userEmail: _emailController.text.trim(), // Use email from form
+              userName: _fullNameController.text.trim().isNotEmpty 
+                  ? _fullNameController.text.trim() 
+                  : 'User', // Use name from form or default
+            ),
           ),
         );
       }
-    } catch (e) {
-      setState(() => isLoading = false);
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('An error occurred: $e'),
+          content: Text(isLogin ? 'Login successful!' : 'Registration successful!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['error']),
           backgroundColor: Colors.red,
         ),
       );
     }
+  } catch (e) {
+    setState(() => isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('An error occurred: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {

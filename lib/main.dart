@@ -28,9 +28,27 @@ class CivicEyeApp extends StatelessWidget {
       home: const LoginSignupPage(),
       routes: {
         '/login': (context) => const LoginSignupPage(),
-        '/user-dashboard': (context) => const DashboardScreen(),
+        '/user-dashboard': (context) {
+          // Get user data from arguments or use defaults
+          final Map<String, String>? userData = 
+              ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
+          
+          return DashboardScreen(
+            userEmail: userData?['email'] ?? 'user@example.com',
+            userName: userData?['name'] ?? 'User',
+          );
+        },
         '/admin-dashboard': (context) => const AdminDashboardPage(),
-        '/main-navigation': (context) => const MainNavigationScreen(),
+        '/main-navigation': (context) {
+          // Get user data from arguments or use defaults
+          final Map<String, String>? userData = 
+              ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
+          
+          return MainNavigationScreen(
+            userEmail: userData?['email'] ?? 'user@example.com',
+            userName: userData?['name'] ?? 'User',
+          );
+        },
       },
     );
   }
@@ -57,7 +75,14 @@ class ReportPage extends StatelessWidget {
 }
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final String userEmail;
+  final String userName;
+  
+  const MainNavigationScreen({
+    super.key,
+    required this.userEmail,
+    required this.userName,
+  });
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -66,10 +91,20 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const ReportPage(), // Now this will work
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize screens with user data
+    _screens = [
+      DashboardScreen(
+        userEmail: widget.userEmail,
+        userName: widget.userName,
+      ),
+      const ReportPage(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

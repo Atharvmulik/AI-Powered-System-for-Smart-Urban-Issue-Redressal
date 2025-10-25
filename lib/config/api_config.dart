@@ -1,41 +1,38 @@
 class ApiConfig {
   static const String baseUrl = 'http://10.0.2.2:8000';
   
-  // ✅ CORRECTED: Use the exact endpoints from your backend
+  // ✅ CORRECTED: Exact endpoints from your FastAPI backend
   static const String loginEndpoint = '/login';
   static const String registerEndpoint = '/signup'; 
-  static const String logoutEndpoint = '/logout';
   static const String reportIssueEndpoint = '/reports/';
   static const String getIssuesEndpoint = '/reports/';
-  static const String uploadImageEndpoint = '/upload';
   static const String getUserIssuesEndpoint = '/users/me/reports';
-
-  // Remove or update these if not used
-  static const String refreshToken = '/refresh';
   
-  // User management endpoints
-  static const String users = '/api/users';
-  static const String userProfile = '/api/users/profile';
+  // ✅ CORRECTED: Dashboard endpoints (PUBLIC - no auth required)
+  static String get dashboardSummary => "/dashboard/summary";
+  static String get dashboardStats => "/dashboard/stats";
+  static String get nearbyIssues => "/reports/nearby";
+  static String get todayResolved => "/reports/resolved/today";
+  static String get todayActivity => "/activity/today";
+  static String get categorySummary => "/reports/category-summary";
   
-  // Issue management endpoints
-  static const String issues = '/api/issues';
-  static String issueById(int id) => '/api/issues/$id';
-  static const String issuesByStatus = '/api/issues/status';
-  static const String urgencyLevelsEndpoint = '/urgency-levels';
+  // ✅ CORRECTED: User complaint tracking (PUBLIC - uses user_email parameter)
+  static String get userReportsFiltered => "/users/reports/filtered";
+  static String get userReportsSearch => "/users/reports/search";
+  static String get reportTimeline => "/reports"; // /{id}/timeline
   
-  // AI Prediction endpoint
-  static const String predict = '/api/predict';
+  // ✅ CORRECTED: Reference data endpoints (PUBLIC)
+  static String get categories => "/categories";
+  static String get urgencyLevels => "/urgency-levels";
+  static String get statuses => "/statuses";
   
-  // Categories and statuses
-  static const String categories = '/api/categories';
-  static const String statuses = '/api/statuses';
+  // ✅ CORRECTED: Action endpoints (may require auth)
+  static String get createReport => "/reports";
+  static String get confirmIssue => "/reports"; // /{id}/confirm
   
-  // Statistics and analytics
-  static const String statsOverview = '/api/stats/overview';
-  static const String statsTimeline = '/api/stats/timeline';
+  // ✅ CORRECTED: User management (AUTH REQUIRED)
+  static const String userProfile = '/users/me';
   
-  // Image upload endpoint
-  static const String uploadImage = '/api/upload';
   
   // Timeout settings
   static const int connectTimeout = 5000;
@@ -49,5 +46,31 @@ class ApiConfig {
     return baseUrl.contains('localhost') || 
            baseUrl.contains('10.0.2.2') || 
            baseUrl.contains('192.168.');
+  }
+  
+  // ✅ Helper method to build full URLs
+  static String buildUrl(String endpoint) {
+    return baseUrl + endpoint;
+  }
+  
+  // ✅ Helper methods for parameterized endpoints
+  static String buildReportTimelineUrl(int reportId) {
+    return '$baseUrl/reports/$reportId/timeline';
+  }
+  
+  static String buildConfirmIssueUrl(int reportId) {
+    return '$baseUrl/reports/$reportId/confirm';
+  }
+  
+  static String buildUserReportsFilteredUrl(String userEmail, {String statusFilter = 'all'}) {
+    return '$baseUrl/users/reports/filtered?user_email=$userEmail&status_filter=$statusFilter';
+  }
+  
+  static String buildUserReportsSearchUrl(String userEmail, String query) {
+    return '$baseUrl/users/reports/search?user_email=$userEmail&query=$query';
+  }
+  
+  static String buildNearbyIssuesUrl(double lat, double lng, {double radius = 5.0}) {
+    return '$baseUrl/reports/nearby?lat=$lat&long=$lng&radius_km=$radius';
   }
 }

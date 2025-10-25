@@ -6,14 +6,20 @@ import '../report/issuereport.dart' as report;
 import '/services/issue_service.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final String userEmail;
+  final String userName;
+  
+  const DashboardScreen({
+    super.key,
+    required this.userEmail,
+    required this.userName,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final String _userName = 'Siddhi';
   List<dynamic> reportedIssues = [];
   bool isLoading = true;
   int _bottomIndex = 0;
@@ -128,12 +134,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: GestureDetector(
               onTap: () => _openProfileSheet(context),
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 18,
                 backgroundColor: Colors.teal,
                 child: Text(
-                  'S',
-                  style: TextStyle(
+                  widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
@@ -214,7 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hello, $_userName! ',
+                  'Hello, ${widget.userName}! ',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -230,8 +236,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Wrap(
                   spacing: 8,
                   children: [
-                    _quickChip('Track', Icons.location_on, () {}),
-                    _quickChip('Nearby Issues', Icons.receipt_long, () {}),
+                    _quickChip('Track', Icons.location_on, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TrackIssuesPage(userEmail: widget.userEmail),
+                        ),
+                      );
+                    }),
+                    _quickChip('Nearby Issues', Icons.receipt_long, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NearbyIssuesPage(),
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ],
@@ -295,6 +315,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 urgency: _getUrgencyValue(issue['urgency'] ?? 'medium'),
                                 distanceKm: 0.5,
                               ),
+                              userEmail: widget.userEmail, // Pass user data
+                              userName: widget.userName,   // Pass user data
                             ),
                           ),
                         );
@@ -513,18 +535,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
               radius: 28,
               backgroundColor: Colors.teal,
               child: Text(
-                _userName.isNotEmpty ? _userName[0] : 'S', 
-                style: const TextStyle(color: Colors.white)
+                widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              _userName,
+              widget.userName,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
+            Text('Email: ${widget.userEmail}'),
+            const SizedBox(height: 6),
             const Text('Ward 12, Volunteer'),
             const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Add logout functionality here
+              },
+              child: const Text('Logout'),
+            ),
           ],
         ),
       ),
@@ -800,5 +835,30 @@ class _DonutPainter extends CustomPainter {
     return oldDelegate.value != value || 
            oldDelegate.bgColor != bgColor || 
            oldDelegate.fgColor != fgColor;
+  }
+}
+
+// Placeholder classes for navigation (you'll need to implement these)
+class TrackIssuesPage extends StatelessWidget {
+  final String userEmail;
+  
+  const TrackIssuesPage({super.key, required this.userEmail});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Track My Issues')),
+      body: Center(child: Text('Track Issues Page for $userEmail')),
+    );
+  }
+}
+
+class NearbyIssuesPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Nearby Issues')),
+      body: Center(child: Text('Nearby Issues Page')),
+    );
   }
 }
