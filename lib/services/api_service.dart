@@ -89,22 +89,6 @@ class ApiService {
     }
   }
 
-  // ❌ REMOVED: Upload image method (not in your backend)
-  // Future<http.Response> uploadImage(String imagePath, String issueId) async {
-  //   // Your backend doesn't have image upload endpoint
-  //   throw Exception('Image upload not supported in current API');
-  // }
-
-  // ✅ ADDED: Specific API methods for your endpoints
-
-  // Authentication
-  Future<http.Response> login(String email, String password, bool isAdmin) async {
-    return await post(ApiConfig.loginEndpoint, {
-      'email': email,
-      'password': password,
-      'is_admin': isAdmin,
-    });
-  }
 
   Future<http.Response> register(String email, String password, String fullName, String mobileNumber) async {
     return await post(ApiConfig.registerEndpoint, {

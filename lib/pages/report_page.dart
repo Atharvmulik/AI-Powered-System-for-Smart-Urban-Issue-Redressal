@@ -32,7 +32,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
     super.dispose();
   }
 
-  Future<void> _submitForm() async {
+    Future<void> _submitForm() async {
   if (!_formKey.currentState!.validate()) return;
 
   setState(() => isLoading = true);
@@ -56,24 +56,40 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
 
     setState(() => isLoading = false);
 
+    print('🎯 LOGIN RESULT ANALYSIS:');
+    print('   - Success: ${result['success']}');
+    print('   - is_admin: ${result['is_admin']}');
+    print('   - Error: ${result['error']}');
+    print('   - Email: ${result['email']}');
+    print('   - User Name: ${result['user_name']}');
+
     if (result['success']) {
+      // Get user data from result
       final bool isAdmin = result['is_admin'] ?? false;
+      final String userName = result['user_name'] ?? 
+          (isLogin ? 'User' : _fullNameController.text.trim());
+      final String userEmail = result['email'] ?? _emailController.text.trim();
+      
+      print('🎯 NAVIGATION DECISION:');
+      print('   - Final isAdmin: $isAdmin');
+      print('   - Final userEmail: $userEmail');
+      print('   - Final userName: $userName');
       
       // Navigate based on user type
       if (isAdmin) {
+        print('🚀 REDIRECTING TO ADMIN DASHBOARD');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
         );
       } else {
+        print('🚀 REDIRECTING TO USER DASHBOARD');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => DashboardScreen(
-              userEmail: _emailController.text.trim(), // Use email from form
-              userName: _fullNameController.text.trim().isNotEmpty 
-                  ? _fullNameController.text.trim() 
-                  : 'User', // Use name from form or default
+              userEmail: userEmail,
+              userName: userName,
             ),
           ),
         );
