@@ -52,7 +52,7 @@ class UserResponse(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
-    is_admin: bool
+    
 
     @validator('password')
     def password_not_empty(cls, v):
