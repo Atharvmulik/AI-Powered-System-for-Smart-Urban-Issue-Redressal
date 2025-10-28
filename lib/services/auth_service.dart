@@ -15,15 +15,15 @@ class AuthService {
   ];
 
   // Check if email is admin
-bool isAdminEmail(String email) {
-  final isAdmin = adminEmails.contains(email.toLowerCase());
-  print('🔍 Admin email check:');
-  print('   - Input email: $email');
-  print('   - Lowercase: ${email.toLowerCase()}');
-  print('   - Admin emails list: $adminEmails');
-  print('   - Is admin: $isAdmin');
-  return isAdmin;
-}
+  bool isAdminEmail(String email) {
+    final isAdmin = adminEmails.contains(email.toLowerCase());
+    print('🔍 Admin email check:');
+    print('   - Input email: $email');
+    print('   - Lowercase: ${email.toLowerCase()}');
+    print('   - Admin emails list: $adminEmails');
+    print('   - Is admin: $isAdmin');
+    return isAdmin;
+  }
   // Login user - CORRECTED VERSION
   Future<Map<String, dynamic>> login(String email, String password) async {
   try {

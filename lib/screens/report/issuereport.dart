@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 import '/services/issue_service.dart'; 
+import '/services/location_service.dart'; 
 import 'dart:async'; 
 import 'dart:io';
+
 
 const _indigo = Colors.indigo;
 const _green = Colors.green;
 const _red = Colors.red;
 const _orange = Colors.orange;
-
 
 class ReportIssuePage extends StatefulWidget {
   const ReportIssuePage({super.key});
@@ -59,7 +58,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     _textDescription.dispose();
     super.dispose();
   }
-
   // ====== simple validations ====
   bool _validateRequired() {
     return _name.text.isNotEmpty &&
@@ -70,51 +68,49 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   }
 
   // ====== LOCATION FUNCTIONALITY ======
-  Future<void> _getCurrentLocation() async {
-    if (!mounted) return;
+Future<void> _getCurrentLocation() async {
+  if (!mounted) return;
+  
+  setState(() {
+    _isLoadingLocation = true;
+  });
+
+  try {
+    print('🔄 Starting location request...');
     
-    setState(() {
-      _isLoadingLocation = true;
+    // Add timeout to prevent freezing
+    LocationResult result = await LocationService.getCurrentLocation()
+        .timeout(Duration(seconds: 30), onTimeout: () {
+      print('⏰ Location request timed out');
+      return LocationResult(
+        success: false,
+        error: 'Location request timed out. Please try again.',
+        requiresPermissionRequest: false,
+      );
     });
 
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (!mounted) return;
-        
-        bool? enableService = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Location Services Disabled'),
-            content: const Text('Please enable location services to use this feature.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Enable'),
-              ),
-            ],
-          ),
-        );
-        
-        if (enableService == true) {
-          await Geolocator.openLocationSettings();
-        }
-        
-        if (mounted) {
-          setState(() { _isLoadingLocation = false; });
-        }
-        return;
-      }
+    if (!mounted) return;
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      
-      if (permission == LocationPermission.denied) {
-        if (!mounted) return;
-        
+    if (result.success) {
+      print('✅ Location captured successfully');
+      setState(() {
+        _currentLat = result.latitude;
+        _currentLong = result.longitude;
+        _currentAddress = result.address ?? "Location: ${result.latitude!.toStringAsFixed(6)}, ${result.longitude!.toStringAsFixed(6)}";
+        _locationChoice = '📍 Current location';
+        _isLoadingLocation = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('📍 Location captured successfully!')),
+      );
+    } else {
+      print('❌ Location failed: ${result.error}');
+      setState(() {
+        _isLoadingLocation = false;
+      });
+
+      if (result.requiresPermissionRequest) {
         bool? requestPermission = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -133,119 +129,28 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
           ),
         );
         
-        if (requestPermission != true) {
-          if (mounted) {
-            setState(() { _isLoadingLocation = false; });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permission is required to use this feature.')),
-            );
-          }
-          return;
+        if (requestPermission == true) {
+          await _getCurrentLocation();
         }
-        
-        permission = await Geolocator.requestPermission();
-        
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            setState(() { _isLoadingLocation = false; });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permissions are denied. Please enable in app settings.')),
-            );
-          }
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          setState(() { _isLoadingLocation = false; });
-        }
-        
-        if (!mounted) return;
-        
-        bool? openSettings = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Location Permission Required'),
-            content: const Text('Location permissions are permanently denied. Please enable them in app settings.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Open Settings'),
-              ),
-            ],
-          ),
-        );
-        
-        if (openSettings == true) {
-          await Geolocator.openAppSettings();
-        }
-        return;
-      }
-
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        Position position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          )
-        ).timeout(const Duration(seconds: 20), onTimeout: () {
-          throw TimeoutException('Location request timed out');
-        });
-
-        List<Placemark> placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
-        ).timeout(const Duration(seconds: 10), onTimeout: () {
-          return [Placemark()];
-        });
-
-        String address = "Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
-        
-        if (placemarks.isNotEmpty && placemarks[0].street != null) {
-          Placemark place = placemarks[0];
-          address = "${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}";
-          address = address.replaceAll(RegExp(r', ,'), ',').replaceAll(RegExp(r'^,\s*'), '');
-        }
-        
-        if (mounted) {
-          setState(() {
-            _currentLat = position.latitude;
-            _currentLong = position.longitude;
-            _currentAddress = address.isNotEmpty ? address : "Location: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}";
-            _locationChoice = '📍 Current location';
-            _isLoadingLocation = false;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('📍 Location captured successfully!')),
-          );
-        }
-      }
-
-    } on TimeoutException catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-        });
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location request timed out: ${e.message}')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
+          SnackBar(content: Text('Location error: ${result.error}')),
         );
       }
     }
+
+  } catch (e) {
+    print('💥 Error in _getCurrentLocation: $e');
+    if (mounted) {
+      setState(() {
+        _isLoadingLocation = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error getting location: $e')),
+      );
+    }
   }
+}
 
   // ====== IMAGE UPLOAD FUNCTIONALITY ======
   Future<void> _showImageSourceDialog() async {
@@ -791,10 +696,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   }
 }
 
-// ... (Keep all the existing helper classes: ConfirmationPage, TrackIssuePage, 
-// _CurvedHeader, _HoverCircleButton, _FieldCard, _MenuTile, _ChoiceSheet, 
-// _HoverListTile, _Badge, _SubmitButton, _TimelineTile) exactly as they are from your original code
-
 /// ================= Confirmation Page =================
 class ConfirmationPage extends StatelessWidget {
   final Map payload;
@@ -880,8 +781,6 @@ class TrackIssuePage extends StatelessWidget {
     );
   }
 }
-
-// ... (Include all the remaining helper classes from your original code)
 
 /// ===================== Reusable UI pieces =====================
 

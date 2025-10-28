@@ -27,7 +27,7 @@ class ApiConfig {
   static String get statuses => "/statuses";
   
   // ✅ CORRECTED: Action endpoints (may require auth)
-  static String get createReport => "/reports";
+  static String get createReport => "/reports/";
   static String get confirmIssue => "/reports"; // /{id}/confirm
   
   // ✅ CORRECTED: User management (AUTH REQUIRED)

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'screens/auth/login_page.dart';
-import 'screens/dashboard/correcteddashboard.dart';
-import 'screens/admin/admin_dashboard.dart';
+import 'pages/report_page.dart';
+import 'screens/dashboard/correcteddashboard.dart'; // ADD THIS IMPORT
 
 void main() {
   runApp(const CivicEyeApp());
@@ -28,19 +27,7 @@ class CivicEyeApp extends StatelessWidget {
       home: const LoginSignupPage(),
       routes: {
         '/login': (context) => const LoginSignupPage(),
-        '/user-dashboard': (context) {
-          // Get user data from arguments or use defaults
-          final Map<String, String>? userData = 
-              ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
-          
-          return DashboardScreen(
-            userEmail: userData?['email'] ?? 'user@example.com',
-            userName: userData?['name'] ?? 'User',
-          );
-        },
-        '/admin-dashboard': (context) => const AdminDashboardPage(),
-        '/main-navigation': (context) {
-          // Get user data from arguments or use defaults
+        '/main-navigation': (context) { // ADD THIS ROUTE
           final Map<String, String>? userData = 
               ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
           

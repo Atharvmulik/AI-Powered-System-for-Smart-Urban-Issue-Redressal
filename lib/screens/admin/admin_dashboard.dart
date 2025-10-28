@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../pages/report_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -51,13 +52,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         elevation: 3,
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
-          ),
-          IconButton(
             onPressed: () {
-              // Navigate back to login
-              Navigator.pushReplacementNamed(context, '/login');
+              // Use direct navigation for logout
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginSignupPage()),
+                (route) => false,
+              );
             },
             icon: const Icon(Icons.logout, color: Colors.white),
           ),

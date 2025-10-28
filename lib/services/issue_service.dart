@@ -1,14 +1,14 @@
 import 'dart:convert';
-// import 'package:http/http.dart' as http;
 import 'api_service.dart';
-// import '../config/api_config.dart';
 
 class IssueService {
   final ApiService _apiService = ApiService();
 
-  // ✅ CORRECTED: Submit report with urgency level
+  // ✅ CORRECTED: Submit report with urgency level - FIXED URL ISSUE
   Future<Map<String, dynamic>> submitReport(Map<String, dynamic> reportData) async {
     try {
+      print('🚀 IssueService: Submitting report with data: $reportData');
+      
       final response = await _apiService.createReport({
         // User Information
         'user_name': reportData['user_name'],
@@ -26,14 +26,28 @@ class IssueService {
         'location_address': reportData['location_address'],
       });
 
+      print('📡 IssueService: Response Status: ${response.statusCode}');
+      print('📄 IssueService: Response Body: ${response.body}');
+
       if (ApiService.isSuccess(response)) {
         final data = ApiService.parseResponse(response);
         return {'success': true, 'data': data};
       } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'error': error['detail'] ?? 'Failed to submit report'};
+        // Handle redirect (307 status code)
+        if (response.statusCode == 307) {
+          print('🔄 IssueService: Redirect detected, handling...');
+          return {'success': false, 'error': 'Redirect issue - please check backend URL'};
+        }
+        
+        try {
+          final error = json.decode(response.body);
+          return {'success': false, 'error': error['detail'] ?? 'Failed to submit report'};
+        } catch (e) {
+          return {'success': false, 'error': 'HTTP ${response.statusCode}: ${response.body}'};
+        }
       }
     } catch (e) {
+      print('💥 IssueService: Error: $e');
       return {'success': false, 'error': e.toString()};
     }
   }

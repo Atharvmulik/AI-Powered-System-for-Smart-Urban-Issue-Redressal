@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../screens/dashboard/correcteddashboard.dart';
-import '../screens/admin/admin_dashboard.dart';
+import '../../screens/dashboard/correcteddashboard.dart';
+import '../../screens/admin/admin_dashboard.dart';
 
 class LoginSignupPage extends StatefulWidget {
   const LoginSignupPage({super.key});
@@ -10,320 +10,473 @@ class LoginSignupPage extends StatefulWidget {
   State<LoginSignupPage> createState() => _LoginSignupPageState();
 }
 
-class _LoginSignupPageState extends State<LoginSignupPage> {
-  final AuthService _authService = AuthService();
-  final _formKey = GlobalKey<FormState>();
-  
+class _LoginSignupPageState extends State<LoginSignupPage>
+    with SingleTickerProviderStateMixin {
   bool isLogin = true;
-  bool isLoading = false;
-  
-  // Controllers
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _mobileController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  bool _isLoading = false;
+
+  final AuthService _authService = AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 250));
+    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+    _controller.forward();
+  }
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _fullNameController.dispose();
-    _mobileController.dispose();
+    _controller.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    nameController.dispose();
+    phoneController.dispose();
     super.dispose();
   }
 
-    Future<void> _submitForm() async {
-  if (!_formKey.currentState!.validate()) return;
+  void toggleTab(bool loginSelected) {
+    setState(() {
+      isLogin = loginSelected;
+    });
+    _controller.forward(from: 0.0);
+  }
 
-  setState(() => isLoading = true);
+  Future<void> _handleAuth() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
 
-  try {
-    Map<String, dynamic> result;
-    
-    if (isLogin) {
-      result = await _authService.login(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isLogin ? "Signing in..." : "Creating account..."))
       );
-    } else {
-      result = await _authService.register(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-        _fullNameController.text.trim(),
-        _mobileController.text.trim(),
-      );
-    }
 
-    setState(() => isLoading = false);
+      try {
+        Map<String, dynamic> result;
+        
+        if (isLogin) {
+          print('🔐 Attempting LOGIN with: ${emailController.text.trim()}');
+          result = await _authService.login(
+            emailController.text.trim(),
+            passwordController.text.trim(),
+          );
+        } else {
+          print('🔐 Attempting REGISTER with: ${emailController.text.trim()}');
+          result = await _authService.register(
+            emailController.text.trim(),
+            passwordController.text.trim(),
+            nameController.text.trim(),
+            phoneController.text.trim(),
+          );
+        }
 
-    print('🎯 LOGIN RESULT ANALYSIS:');
-    print('   - Success: ${result['success']}');
-    print('   - is_admin: ${result['is_admin']}');
-    print('   - Error: ${result['error']}');
-    print('   - Email: ${result['email']}');
-    print('   - User Name: ${result['user_name']}');
+        setState(() {
+          _isLoading = false;
+        });
 
-    if (result['success']) {
-      // Get user data from result
-      final bool isAdmin = result['is_admin'] ?? false;
-      final String userName = result['user_name'] ?? 
-          (isLogin ? 'User' : _fullNameController.text.trim());
-      final String userEmail = result['email'] ?? _emailController.text.trim();
-      
-      print('🎯 NAVIGATION DECISION:');
-      print('   - Final isAdmin: $isAdmin');
-      print('   - Final userEmail: $userEmail');
-      print('   - Final userName: $userName');
-      
-      // Navigate based on user type
-      if (isAdmin) {
-        print('🚀 REDIRECTING TO ADMIN DASHBOARD');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
-        );
-      } else {
-        print('🚀 REDIRECTING TO USER DASHBOARD');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DashboardScreen(
-              userEmail: userEmail,
-              userName: userName,
-            ),
-          ),
+        // 🔍 EXTENSIVE DEBUGGING
+        print('🎯 FULL RESULT OBJECT:');
+        print('   - Entire result: $result');
+        print('   - Success: ${result['success']} (type: ${result['success'].runtimeType})');
+        print('   - is_admin: ${result['is_admin']} (type: ${result['is_admin'].runtimeType})');
+        print('   - Error: ${result['error']}');
+        print('   - Email: ${result['email']}');
+        print('   - User Name: ${result['user_name']}');
+
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isLogin ? "Login successful!" : "Account created!"),
+              backgroundColor: Colors.green,
+            )
+          );
+          
+          // Get user data from result
+          final dynamic isAdminRaw = result['is_admin'];
+          final bool isAdmin = isAdminRaw == true || isAdminRaw == 'true' || isAdminRaw == 1;
+          final String userName = result['user_name'] ?? 
+              (isLogin ? 'User' : nameController.text.trim());
+          final String userEmail = result['email'] ?? emailController.text.trim();
+          
+          // 🔍 CRITICAL DEBUG INFO
+          print('🎯 FINAL NAVIGATION ANALYSIS:');
+          print('   - Raw is_admin value: $isAdminRaw');
+          print('   - Final isAdmin boolean: $isAdmin');
+          print('   - User Email: $userEmail');
+          print('   - Is admin email: ${emailController.text.trim().contains('admin')}');
+          
+          // Navigate based on user type using DIRECT navigation
+          if (isAdmin) {
+            print('🚀 ADMIN DETECTED - REDIRECTING TO ADMIN DASHBOARD');
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+              (route) => false,
+            );
+          } else {
+            print('🚀 USER DETECTED - REDIRECTING TO USER DASHBOARD');
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DashboardScreen(
+                  userEmail: userEmail,
+                  userName: userName,
+                ),
+              ),
+              (route) => false,
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error: ${result['error']}"),
+              backgroundColor: Colors.red,
+            )
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+        print('❌ EXCEPTION: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Network error: $e"),
+            backgroundColor: Colors.red,
+          )
         );
       }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isLogin ? 'Login successful!' : 'Registration successful!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['error']),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
-  } catch (e) {
-    setState(() => isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('An error occurred: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
 
   @override
   Widget build(BuildContext context) {
+    const tealColor = Color(0xFF006D5B);
+
     return Scaffold(
-      body: SafeArea(
+      backgroundColor: Colors.grey[100],
+      body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 40),
-                
-                // Logo and Title
-                Center(
-                  child: Column(
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Container(
+              width: 380,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.apartment, size: 60, color: tealColor),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "CIVIC EYE",
+                    style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: tealColor),
+                  ),
+                  const Text(
+                    "AI-powered smart civic issue management",
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Toggle Tabs
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.radio_button_checked,
-                        size: 60,
-                        color: Colors.teal,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'CivicEye',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal.shade800,
-                        ),
-                      ),
-                      Text(
-                        isLogin ? 'Welcome Back!' : 'Create Account',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey,
-                        ),
-                      ),
+                      _buildTabButton("Sign In", true, tealColor),
+                      const SizedBox(width: 20),
+                      _buildTabButton("Sign Up", false, tealColor),
                     ],
                   ),
-                ),
-                
-                const SizedBox(height: 40),
+                  const SizedBox(height: 25),
 
-                // Full Name Field (only for registration)
-                if (!isLogin) ...[
-                  TextFormField(
-                    controller: _fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
+                  // Title
+                  Text(
+                    isLogin ? "Welcome Back" : "Create Account",
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    isLogin
+                        ? "Sign in to access the civic issue management system"
+                        : "Join the smart civic issue management system",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 25),
+
+                  // Admin Access Info (only for login)
+                  if (isLogin) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                      ),
+                      child: const Column(
+                        children: [
+                          Text(
+                            'Admin Access:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.teal,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Use admin1@civiceye.com to admin4@civiceye.com\nor vaishnavi@civiceye.com',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.teal,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your full name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                    const SizedBox(height: 15),
+                  ],
 
-                // Email Field
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email),
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
+                  // Form Fields
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        // Name Field (only for signup)
+                        if (!isLogin) ...[
+                          TextFormField(
+                            controller: nameController,
+                            decoration: InputDecoration(
+                              labelText: "Full Name",
+                              prefixIcon: const Icon(Icons.person_outline),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (!isLogin && (value == null || value.isEmpty)) {
+                                return "Please enter your full name";
+                              }
+                              if (!isLogin && value!.length < 2) {
+                                return "Name must be at least 2 characters";
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 15),
+                          
+                          // Phone Field (only for signup)
+                          TextFormField(
+                            controller: phoneController,
+                            decoration: InputDecoration(
+                              labelText: "Phone Number",
+                              prefixIcon: const Icon(Icons.phone_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.phone,
+                            validator: (value) {
+                              if (!isLogin && (value == null || value.isEmpty)) {
+                                return "Please enter your phone number";
+                              }
+                              if (!isLogin && !RegExp(r'^\d{10}$').hasMatch(value!)) {
+                                return "Phone must be 10 digits";
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 15),
+                        ],
 
-                // Mobile Field (only for registration)
-                if (!isLogin) ...[
-                  TextFormField(
-                    controller: _mobileController,
-                    decoration: const InputDecoration(
-                      labelText: 'Mobile Number',
-                      prefixIcon: Icon(Icons.phone),
-                      border: OutlineInputBorder(),
+                        // Email Field
+                        TextFormField(
+                          controller: emailController,
+                          decoration: InputDecoration(
+                            labelText: "Email",
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return "Please enter your email";
+                            }
+                            if (!value.contains('@')) {
+                              return "Please enter a valid email";
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 15),
+                        
+                        // Password Field
+                        TextFormField(
+                          controller: passwordController,
+                          decoration: InputDecoration(
+                            labelText: "Password",
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          obscureText: true,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return "Please enter your password";
+                            }
+                            if (value.length < 6) {
+                              return "Password must be at least 6 characters";
+                            }
+                            return null;
+                          },
+                        ),
+
+                        // Confirm Password (only for signup)
+                        if (!isLogin) ...[
+                          const SizedBox(height: 15),
+                          TextFormField(
+                            controller: confirmPasswordController,
+                            decoration: InputDecoration(
+                              labelText: "Confirm Password",
+                              prefixIcon: const Icon(Icons.lock_person_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            obscureText: true,
+                            validator: (value) {
+                              if (!isLogin && (value == null || value.isEmpty)) {
+                                return "Please confirm your password";
+                              }
+                              if (!isLogin && value != passwordController.text) {
+                                return "Passwords do not match";
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ],
                     ),
-                    keyboardType: TextInputType.phone,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your mobile number';
-                      }
-                      if (value.length < 10) {
-                        return 'Please enter a valid mobile number';
-                      }
-                      return null;
-                    },
                   ),
-                  const SizedBox(height: 16),
-                ],
 
-                // Password Field
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock),
-                    border: OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 25),
 
-                // Submit Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : _submitForm,
+                  // Submit Button
+                  ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      backgroundColor: tealColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 4,
+                      shadowColor: tealColor.withOpacity(0.4),
                     ),
-                    child: isLoading
+                    onPressed: _isLoading ? null : _handleAuth,
+                    child: _isLoading
                         ? const SizedBox(
-                            width: 20,
                             height: 20,
+                            width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : Text(isLogin ? 'Login' : 'Sign Up'),
+                        : Text(
+                            isLogin ? "Sign In" : "Create Account",
+                            style: const TextStyle(
+                                fontSize: 18, color: Colors.white, letterSpacing: 1),
+                          ),
                   ),
-                ),
-                const SizedBox(height: 20),
 
-                // Switch between Login/Signup
-                Center(
-                  child: TextButton(
-                    onPressed: isLoading
-                        ? null
-                        : () {
-                            setState(() => isLogin = !isLogin);
-                          },
-                    child: Text(
-                      isLogin
-                          ? "Don't have an account? Sign Up"
-                          : "Already have an account? Login",
-                      style: const TextStyle(color: Colors.teal),
+                  // Forgot Password Link
+                  if (isLogin) ...[
+                    const SizedBox(height: 15),
+                    TextButton(
+                      onPressed: _isLoading ? null : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Forgot password feature coming soon!"))
+                        );
+                      },
+                      child: const Text(
+                        "Forgot Password?",
+                        style: TextStyle(color: Colors.blue),
+                      ),
                     ),
-                  ),
-                ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-                // Admin Info
-                const SizedBox(height: 20),
-                const Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'Admin Access:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Use admin1@civiceye.com to admin4@civiceye.com\nor vaishnavi@civiceye.com to access admin dashboard',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Admin accounts cannot be registered',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+  Widget _buildTabButton(String label, bool loginTab, Color tealColor) {
+    final bool isActive = loginTab == isLogin;
+
+    return MouseRegion(
+      onEnter: (_) => _controller.forward(),
+      onExit: (_) => _controller.reverse(),
+      child: GestureDetector(
+        onTap: _isLoading ? null : () => toggleTab(loginTab),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? tealColor : Colors.grey[200],
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: tealColor.withOpacity(0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.grey[600],
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
