@@ -48,40 +48,51 @@ class ActivityLog(Base):
     description = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from datetime import datetime
+
 class Report(Base):
     __tablename__ = "reports"
     
     id = Column(Integer, primary_key=True, index=True)
     
-    # User Information (for anonymous reports)
-    user_name = Column(String, nullable=False)
-    user_mobile = Column(String(10), nullable=False)
-    user_email = Column(String, nullable=True)
-    
+    # User Information
+    user_name = Column(String(255), nullable=False)  # Added length limit
+    user_mobile = Column(String(15), nullable=False)  # Increased length for international numbers
+    user_email = Column(String(255), nullable=True)   # Added length limit
+
     # Issue Information
-    issue_type = Column(String, nullable=False)  
-    title = Column(String, nullable=False)
+    title = Column(String(255), nullable=False)       # Added length limit
     description = Column(Text, nullable=False)
+    category = Column(String(50), nullable=False)     # Added length limit
+    urgency_level = Column(String(20), nullable=False) # Added length limit
+    
+    # Status Information
+    status = Column(String(20), default="Pending")    # Added length limit
     
     # Location Information
     location_lat = Column(Float, nullable=False)
     location_long = Column(Float, nullable=False)
     location_address = Column(Text, nullable=True)
+    distance = Column(Float, nullable=True)  # Distance in km
+    
+    # Admin Assignment
+    assigned_department = Column(String(100), nullable=True)  # Added length limit
+    resolution_notes = Column(Text, nullable=True)
+    resolved_by = Column(String(255), nullable=True)  # Added length limit
     
     # Media Files
-    images = Column(Text, nullable=True)
-    voice_note = Column(String, nullable=True)
+    images = Column(Text, nullable=True)  # JSON string or comma-separated paths
+    voice_note = Column(String(500), nullable=True)  # Added length limit for file path
     
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Timestamps - Improved with server_default
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     # Foreign keys
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    category_id = Column(Integer, ForeignKey("categories.id"))
-    status_id = Column(Integer, ForeignKey("statuses.id"))
     
     # Relationships
     user = relationship("User", back_populates="reports")
-    category = relationship("Category")
-    status = relationship("Status")

@@ -13,6 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import math
 from sqlalchemy.orm import selectinload
 
+from fastapi import FastAPI, HTTPException, Depends
+from sqlalchemy.orm import Session
+from typing import List, Optional
+from app import models, schemas, database
+from sqlalchemy.future import select
+
 from app import models
 from app.database import get_db, engine, AsyncSessionLocal
 from app.models import Report, User, Category, Status
@@ -463,16 +469,6 @@ async def read_own_reports(
     result = await db.execute(select(Report).filter(Report.user_id == current_user.id))
     user_reports = result.scalars().all()
     return user_reports
-
-# Get all reports (Admin only)
-@app.get("/admin/reports")
-async def read_all_reports(
-    current_user: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    result = await db.execute(select(Report))
-    all_reports = result.scalars().all()
-    return all_reports
 
 # Get all categories
 @app.get("/categories")
@@ -1089,3 +1085,164 @@ async def get_report_timeline(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching report timeline: {str(e)}"
         )
+    
+
+
+
+# admin endpoints
+
+
+@app.get("/api/admin/issues")
+async def get_admin_issues(db: AsyncSession = Depends(get_db)):
+    try:
+        # Execute query using the session
+        result = await db.execute(select(Report))
+        issues = result.scalars().all()
+        
+        # Convert to list of dictionaries
+        issues_list = []
+        for issue in issues:
+            issues_list.append({
+                "id": issue.id,
+                "user_name": issue.user_name,
+                "user_email": issue.user_email,
+                "user_mobile": issue.user_mobile,
+                "title": issue.title,
+                "description": issue.description,
+                "category": issue.category,
+                "urgency_level": issue.urgency_level,
+                "status": issue.status,
+                "location_address": issue.location_address,
+                "assigned_department": issue.assigned_department,
+                "resolution_notes": issue.resolution_notes,
+                "images": issue.images,
+                "created_at": issue.created_at.isoformat() if issue.created_at else None,
+                "updated_at": issue.updated_at.isoformat() if issue.updated_at else None
+            })
+        
+        return {"issues": issues_list}
+        
+    except Exception as e:
+        print(f"Error fetching issues: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+# 2. Get Single Report Details
+@app.get("/api/admin/issues/{report_id}", response_model=schemas.ReportResponse)
+async def get_issue_details(report_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await db.execute(
+            select(models.Report).where(models.Report.id == report_id)
+        )
+        report = result.scalar_one_or_none()
+        if not report:
+            raise HTTPException(status_code=404, detail="Issue not found")
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# 3. Update Report Status - CORRECTED FOR STRING STATUS
+@app.patch("/api/admin/issues/{report_id}/status")
+async def update_issue_status(report_id: int, status_update: schemas.StatusUpdate, db: AsyncSession = Depends(get_db)):
+    try:
+        # Get the report
+        result = await db.execute(
+            select(models.Report).where(models.Report.id == report_id)
+        )
+        report = result.scalar_one_or_none()
+        
+        if not report:
+            raise HTTPException(status_code=404, detail="Issue not found")
+        
+        # Update the status directly as string
+        report.status = status_update.status
+        report.updated_at = datetime.utcnow()
+        
+        # Commit the changes
+        await db.commit()
+        await db.refresh(report)
+        
+        return {"message": "Status updated successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# 4. Assign Report to Department - CORRECTED
+@app.patch("/api/admin/issues/{report_id}/assign")
+async def assign_to_department(report_id: int, assign_data: schemas.DepartmentAssign, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await db.execute(
+            select(models.Report).where(models.Report.id == report_id)
+        )
+        report = result.scalar_one_or_none()
+        
+        if not report:
+            raise HTTPException(status_code=404, detail="Issue not found")
+        
+        report.assigned_department = assign_data.department
+        report.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(report)
+        
+        return {"message": "Issue assigned to department successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# 5. Delete Report - CORRECTED (no changes needed here)
+@app.delete("/api/admin/issues/{report_id}")
+async def delete_issue(report_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await db.execute(
+            select(models.Report).where(models.Report.id == report_id)
+        )
+        report = result.scalar_one_or_none()
+        
+        if not report:
+            raise HTTPException(status_code=404, detail="Issue not found")
+        
+        await db.delete(report)
+        await db.commit()
+        
+        return {"message": "Issue deleted successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# 6. Verify & Resolve Report - CORRECTED FOR STRING STATUS
+@app.post("/api/admin/issues/{report_id}/resolve")
+async def resolve_issue(report_id: int, resolve_data: schemas.ResolveIssue, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await db.execute(
+            select(models.Report).where(models.Report.id == report_id)
+        )
+        report = result.scalar_one_or_none()
+        
+        if not report:
+            raise HTTPException(status_code=404, detail="Issue not found")
+        
+        # Update status to Resolved as string
+        report.status = "Resolved"
+        report.resolution_notes = resolve_data.resolution_notes
+        report.resolved_by = resolve_data.resolved_by
+        report.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(report)
+        
+        return {"message": "Issue resolved successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# 7. Get All Departments - CORRECTED (no changes needed here)
+@app.get("/api/admin/departments")
+async def get_departments():
+    departments = [
+        {"id": 1, "name": "Public Works", "email": "publicworks@city.gov", "phone": "+1-555-0101", "head": "John Smith"},
+        {"id": 2, "name": "Water Dept", "email": "waterdept@city.gov", "phone": "+1-555-0102", "head": "Sarah Johnson"},
+        {"id": 3, "name": "Road Dept", "email": "roaddept@city.gov", "phone": "+1-555-0103", "head": "Mike Brown"},
+        {"id": 4, "name": "Sanitation Dept", "email": "sanitation@city.gov", "phone": "+1-555-0104", "head": "Lisa Davis"},
+        {"id": 5, "name": "Other", "email": "other@city.gov", "phone": "+1-555-0105", "head": "Admin"}
+    ]
+    return departments
