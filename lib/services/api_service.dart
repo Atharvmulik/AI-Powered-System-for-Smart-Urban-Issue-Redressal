@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../models/admin_issue_model.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -28,7 +29,7 @@ class ApiService {
     return headers;
   }
 
-  // ✅ CORRECTED: Generic POST method
+  // ✅ Generic POST method
   Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
     try {
       final url = '$baseUrl$endpoint';
@@ -51,7 +52,30 @@ class ApiService {
     }
   }
 
-  // ✅ CORRECTED: Generic GET method
+  // ✅ Generic PATCH method
+  Future<http.Response> patch(String endpoint, Map<String, dynamic> data) async {
+    try {
+      final url = '$baseUrl$endpoint';
+      print('🌐 PATCH Request to: $url');
+      print('📦 Request Data: $data');
+      
+      final response = await http.patch(
+        Uri.parse(url),
+        headers: getHeaders(),
+        body: json.encode(data),
+      );
+      
+      print('📡 Response Status: ${response.statusCode}');
+      print('📄 Response Body: ${response.body}');
+      
+      return response;
+    } catch (e) {
+      print('❌ PATCH Error: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // ✅ Generic GET method
   Future<http.Response> get(String endpoint) async {
     try {
       final url = '$baseUrl$endpoint';
@@ -70,7 +94,7 @@ class ApiService {
     }
   }
 
-  // ✅ CORRECTED: GET with query parameters
+  // ✅ GET with query parameters
   Future<http.Response> getWithParams(String endpoint, Map<String, String> params) async {
     try {
       final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: params);
@@ -89,6 +113,94 @@ class ApiService {
     }
   }
 
+  // ==================== ADMIN ENDPOINTS ====================
+
+  // Get all issues for admin - UPDATED FOR STRING STATUS
+  Future<http.Response> getAdminIssues({String? status, String? department}) async {
+    final params = <String, String>{};
+    if (status != null && status != 'all') params['status'] = status;
+    if (department != null) params['department'] = department;
+    
+    return await getWithParams('/api/admin/issues', params);
+  }
+
+  // Get all admin issues as List<AdminIssue>
+  Future<List<AdminIssue>> getAdminIssuesList({String? status, String? department}) async {
+    try {
+      final response = await getAdminIssues(status: status, department: department);
+      
+      print('🔍 Raw API Response: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> issuesJson = data['issues'] ?? [];
+        
+        print('🔍 Number of issues received: ${issuesJson.length}');
+        
+        List<AdminIssue> issues = issuesJson.map((json) => AdminIssue.fromJson(json)).toList();
+        return issues;
+      } else {
+        print('❌ API Error: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to load issues: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Network Error: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Get single issue details
+  Future<http.Response> getAdminIssueDetails(int reportId) async {
+    return await get('/api/admin/issues/$reportId');
+  }
+
+  // Update issue status - UPDATED FOR STRING STATUS
+  Future<http.Response> updateIssueStatus(int reportId, String status) async {
+    return await patch('/api/admin/issues/$reportId/status', {
+      'status': status,
+    });
+  }
+
+  // Assign issue to department - UPDATED FOR STRING STATUS
+  Future<http.Response> assignToDepartment(int reportId, String department) async {
+    return await patch('/api/admin/issues/$reportId/assign', {
+      'department': department,
+    });
+  }
+
+  // Delete issue
+  Future<http.Response> deleteIssue(int reportId) async {
+    try {
+      final url = '$baseUrl/api/admin/issues/$reportId';
+      print('🌐 DELETE Request to: $url');
+      
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: getHeaders(),
+      );
+      
+      print('📡 Response Status: ${response.statusCode}');
+      return response;
+    } catch (e) {
+      print('❌ DELETE Error: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // Resolve issue - UPDATED FOR STRING STATUS
+  Future<http.Response> resolveIssue(int reportId, String resolutionNotes, String resolvedBy) async {
+    return await post('/api/admin/issues/$reportId/resolve', {
+      'resolution_notes': resolutionNotes,
+      'resolved_by': resolvedBy,
+    });
+  }
+
+  // Get all departments
+  Future<http.Response> getDepartments() async {
+    return await get('/api/admin/departments');
+  }
+
+  // ==================== EXISTING ENDPOINTS ====================
 
   Future<http.Response> register(String email, String password, String fullName, String mobileNumber) async {
     return await post(ApiConfig.registerEndpoint, {

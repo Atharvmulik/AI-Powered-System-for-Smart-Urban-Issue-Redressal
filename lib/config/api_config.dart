@@ -28,11 +28,14 @@ class ApiConfig {
   
   // ✅ CORRECTED: Action endpoints (may require auth)
   static String get createReport => "/reports/";
-  static String get confirmIssue => "/reports"; // /{id}/confirm
-  
-  // ✅ CORRECTED: User management (AUTH REQUIRED)
+  static String get confirmIssue => "/reports"; 
   static const String userProfile = '/users/me';
   
+  // ==================== NEW ADMIN ENDPOINTS ====================
+  
+  // Admin Issue Management
+  static String get adminIssues => "/api/admin/issues";
+  static String get adminDepartments => "/api/admin/departments";
   
   // Timeout settings
   static const int connectTimeout = 5000;
@@ -72,5 +75,42 @@ class ApiConfig {
   
   static String buildNearbyIssuesUrl(double lat, double lng, {double radius = 5.0}) {
     return '$baseUrl/reports/nearby?lat=$lat&long=$lng&radius_km=$radius';
+  }
+  
+  // ==================== NEW ADMIN HELPER METHODS ====================
+  
+  // Admin endpoints helper methods
+  static String buildAdminIssueDetailsUrl(int reportId) {
+    return '$baseUrl/api/admin/issues/$reportId';
+  }
+  
+  static String buildAdminUpdateStatusUrl(int reportId) {
+    return '$baseUrl/api/admin/issues/$reportId/status';
+  }
+  
+  static String buildAdminAssignDepartmentUrl(int reportId) {
+    return '$baseUrl/api/admin/issues/$reportId/assign';
+  }
+  
+  static String buildAdminDeleteIssueUrl(int reportId) {
+    return '$baseUrl/api/admin/issues/$reportId';
+  }
+  
+  static String buildAdminResolveIssueUrl(int reportId) {
+    return '$baseUrl/api/admin/issues/$reportId/resolve';
+  }
+  
+  static String buildAdminIssuesWithParams({String? status, String? department}) {
+    String url = '$baseUrl/api/admin/issues';
+    final params = <String>[];
+    
+    if (status != null) params.add('status=$status');
+    if (department != null) params.add('department=$department');
+    
+    if (params.isNotEmpty) {
+      url += '?${params.join('&')}';
+    }
+    
+    return url;
   }
 }

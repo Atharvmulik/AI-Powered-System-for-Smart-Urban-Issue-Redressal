@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../pages/report_page.dart';
+import '../../pages/view_issue_admin.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -31,7 +32,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   void _onNavTapped(int index) {
-    setState(() => _selectedIndex = index);
+    if (index == 2) { // Issue Reports index
+      // Navigate to ViewIssueAdminPage when Issue Reports is tapped
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const IssueTrackingPage()),
+      );
+    } else {
+      // For other tabs, use the existing page switching
+      setState(() => _selectedIndex = index);
+    }
   }
 
   @override
