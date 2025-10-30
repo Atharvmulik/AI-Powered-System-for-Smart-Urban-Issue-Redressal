@@ -1,6 +1,25 @@
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List
 import re
+from datetime import datetime
+from enum import Enum
+
+class UrgencyLevel(str, Enum):
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+    URGENT = "Urgent"
+
+class Status(str, Enum):
+    PENDING = "Pending"
+    IN_PROGRESS = "In Progress"
+    RESOLVED = "Resolved"
+
+class Category(str, Enum):
+    GARBAGE = "Garbage"
+    WATER = "Water"
+    SANITATION = "Sanitation"
+    OTHER = "Other"
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -37,7 +56,6 @@ class UserCreate(BaseModel):
             raise ValueError('Cannot self-assign admin role during signup')
         return v
 
-# Schema for what we return to the client (hiding the password)
 class UserResponse(BaseModel):
     id: int
     email: EmailStr
@@ -48,26 +66,24 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# Schema for user login
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
     
-
     @validator('password')
     def password_not_empty(cls, v):
         if not v or len(v) < 1:
             raise ValueError('Password cannot be empty')
         return v
 
-# ✅ UPDATED: ReportCreate schema with urgency_level
 class ReportCreate(BaseModel):
     user_name: str
     user_mobile: str
     user_email: Optional[str] = None
-    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
     title: str
     description: str
+    category: str  # Garbage, Water, Sanitation, Other
+    urgency_level: str  # Low, Medium, High, Urgent
     location_lat: float  
     location_long: float  
     location_address: Optional[str] = None
@@ -86,9 +102,16 @@ class ReportCreate(BaseModel):
             raise ValueError('Mobile number must be exactly 10 digits')
         return v
 
+    @validator('category')
+    def validate_category(cls, v):
+        valid_categories = ["Garbage", "Water", "Sanitation", "Other"]
+        if v not in valid_categories:
+            raise ValueError(f'Category must be one of: {", ".join(valid_categories)}')
+        return v
+
     @validator('urgency_level')
     def validate_urgency_level(cls, v):
-        valid_urgency_levels = ["High", "Medium", "Low"]
+        valid_urgency_levels = ["Low", "Medium", "High", "Urgent"]
         if v not in valid_urgency_levels:
             raise ValueError(f'Urgency level must be one of: {", ".join(valid_urgency_levels)}')
         return v
@@ -130,55 +153,41 @@ class ReportResponse(BaseModel):
     user_name: str
     user_mobile: str
     user_email: Optional[str]
-    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
     title: str
     description: str
+    category: str
+    urgency_level: str
+    status: str
     location_lat: float
     location_long: float
     location_address: Optional[str]
+    distance: Optional[float]
     images: Optional[str]
     voice_note: Optional[str]
-    created_at: str
-    updated_at: str
-    category_name: Optional[str]
-    status_name: Optional[str]
+    assigned_department: Optional[str]
+    resolution_notes: Optional[str]
+    resolved_by: Optional[str]
+    created_at: datetime
+    updated_at: datetime
     user_id: Optional[int]
 
     class Config:
         from_attributes = True
 
 class ReportCreateWithMedia(BaseModel):
-    # User Information
     user_name: str
     user_mobile: str
     user_email: Optional[str] = None
-    
-    # Issue Information
-    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
     title: str
     description: str
-    
-    # Location Information
+    category: str
+    urgency_level: str
     location_lat: float
     location_long: float
     location_address: Optional[str] = None
-    
-    # Media Information (file paths/URLs after upload)
     image_paths: Optional[List[str]] = None
     voice_note_path: Optional[str] = None
 
-# Schema for status update
-class StatusUpdate(BaseModel):
-    new_status: str
-
-    @validator('new_status')
-    def validate_status(cls, v):
-        valid_statuses = ["Reported", "In Progress", "Resolved", "Closed"]
-        if v not in valid_statuses:
-            raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
-        return v
-
-# Schema for token response
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
@@ -188,12 +197,47 @@ class TokenResponse(BaseModel):
     email: str
     message: str
 
-# Schema for file upload response
 class FileUploadResponse(BaseModel):
     filename: str
     file_url: str
     message: str
 
-# ✅ ADDED: Schema for urgency levels response
 class UrgencyLevelsResponse(BaseModel):
     urgency_levels: List[str]
+
+class CategoriesResponse(BaseModel):
+    categories: List[str]
+
+class StatusResponse(BaseModel):
+    statuses: List[str]
+
+# Admin schemas
+class StatusUpdate(BaseModel):
+    status: str  # "Pending", "In Progress", "Resolved"
+
+    @validator('status')
+    def validate_status(cls, v):
+        valid_statuses = ["Pending", "In Progress", "Resolved"]
+        if v not in valid_statuses:
+            raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
+        return v
+
+class DepartmentAssign(BaseModel):
+    department: str
+
+class ResolveIssue(BaseModel):
+    resolution_notes: str
+    resolved_by: str
+
+class AdminReportsResponse(BaseModel):
+    reports: List[ReportResponse]
+    total_count: int
+    pending_count: int
+    in_progress_count: int
+    resolved_count: int
+
+class ReportStats(BaseModel):
+    total_reports: int
+    pending_reports: int
+    in_progress_reports: int
+    resolved_reports: int
