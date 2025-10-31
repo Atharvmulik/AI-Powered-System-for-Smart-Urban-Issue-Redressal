@@ -113,6 +113,65 @@ class ApiService {
     }
   }
 
+  // ==================== DEPARTMENT ANALYSIS ENDPOINTS ====================
+
+  // Get departments summary
+  Future<http.Response> getDepartmentsSummary({String period = 'month'}) async {
+    return await getWithParams(ApiConfig.departmentsSummary, {
+      'period': period,
+    });
+  }
+
+  // Get department details
+  Future<http.Response> getDepartmentDetails(int deptId, {String period = 'month'}) async {
+    return await getWithParams('${ApiConfig.departmentDetails}/$deptId', {
+      'period': period,
+    });
+  }
+
+  // Get issues by department for bar chart
+  Future<http.Response> getDepartmentIssues({String period = 'month'}) async {
+    return await getWithParams(ApiConfig.departmentIssues, {
+      'period': period,
+    });
+  }
+
+  // Get resolution trends
+  Future<http.Response> getResolutionTrends({String period = 'month'}) async {
+    return await getWithParams(ApiConfig.resolutionTrends, {
+      'period': period,
+    });
+  }
+
+  // Get department efficiency trend
+  Future<http.Response> getDepartmentEfficiencyTrend(int deptId, {int months = 6}) async {
+    return await getWithParams('${ApiConfig.departmentEfficiencyTrend}/$deptId/efficiency-trend', {
+      'months': months.toString(),
+    });
+  }
+
+  // Submit department feedback
+  Future<http.Response> submitDepartmentFeedback(int departmentId, String feedbackText, {int? rating, String? userName}) async {
+    final data = {
+      'department_id': departmentId,
+      'feedback_text': feedbackText,
+    };
+    
+    if (rating != null) data['rating'] = rating;
+    if (userName != null) data['user_name'] = userName;
+    
+    return await post(ApiConfig.departmentFeedback, data);
+  }
+
+  // Update issues status in bulk
+  Future<http.Response> updateIssuesStatus(int departmentId, List<int> issueIds, String newStatus) async {
+    return await post(ApiConfig.updateIssuesStatus, {
+      'department_id': departmentId,
+      'issue_ids': issueIds,
+      'new_status': newStatus,
+    });
+  }
+
   // ==================== ADMIN ENDPOINTS ====================
 
   // Get all issues for admin - UPDATED FOR STRING STATUS

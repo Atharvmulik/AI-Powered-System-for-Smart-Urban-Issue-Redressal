@@ -37,6 +37,17 @@ class ApiConfig {
   static String get adminIssues => "/api/admin/issues";
   static String get adminDepartments => "/api/admin/departments";
   
+  // ==================== DEPARTMENT ANALYSIS ENDPOINTS ====================
+  
+  // Department Analysis
+  static String get departmentsSummary => "/api/departments/summary";
+  static String get departmentDetails => "/api/departments"; // /{dept_id}
+  static String get departmentIssues => "/api/departments/issues/by-department";
+  static String get resolutionTrends => "/api/departments/resolution-trends";
+  static String get departmentEfficiencyTrend => "/api/departments"; // /{dept_id}/efficiency-trend
+  static String get departmentFeedback => "/api/departments/feedback";
+  static String get updateIssuesStatus => "/api/departments/update-issues-status";
+  
   // Timeout settings
   static const int connectTimeout = 5000;
   static const int receiveTimeout = 15000;
@@ -112,5 +123,28 @@ class ApiConfig {
     }
     
     return url;
+  }
+  
+  // ==================== NEW DEPARTMENT ANALYSIS HELPER METHODS ====================
+  
+  // Department analysis helper methods
+  static String buildDepartmentDetailsUrl(int deptId) {
+    return '$baseUrl/api/departments/$deptId';
+  }
+  
+  static String buildDepartmentEfficiencyTrendUrl(int deptId, {int months = 6}) {
+    return '$baseUrl/api/departments/$deptId/efficiency-trend?months=$months';
+  }
+  
+  static String buildDepartmentIssuesUrl({String period = 'month'}) {
+    return '$baseUrl/api/departments/issues/by-department?period=$period';
+  }
+  
+  static String buildResolutionTrendsUrl({String period = 'month'}) {
+    return '$baseUrl/api/departments/resolution-trends?period=$period';
+  }
+  
+  static String buildDepartmentsSummaryUrl({String period = 'month'}) {
+    return '$baseUrl/api/departments/summary?period=$period';
   }
 }
