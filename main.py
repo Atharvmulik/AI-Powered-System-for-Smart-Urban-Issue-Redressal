@@ -1246,3 +1246,415 @@ async def get_departments():
         {"id": 5, "name": "Other", "email": "other@city.gov", "phone": "+1-555-0105", "head": "Admin"}
     ]
     return departments
+
+
+
+
+
+# Department Analysis Endpoints
+
+# Helper functions (put these outside the endpoint functions, at the top level of your file)
+
+def get_department_icon(dept_name: str) -> str:
+    icon_mapping = {
+        "Water Dept": "water_drop",
+        "Road Dept": "traffic", 
+        "Sanitation Dept": "clean_hands",
+        "Electricity Dept": "lightbulb",
+        "Public Works": "engineering"
+    }
+    return icon_mapping.get(dept_name, "build")
+
+def get_category_from_department(dept_name: str) -> str:
+    category_mapping = {
+        "Water Dept": "Utilities",
+        "Road Dept": "Infrastructure",
+        "Sanitation Dept": "Sanitation", 
+        "Electricity Dept": "Environment",
+        "Public Works": "Public Safety"
+    }
+    return category_mapping.get(dept_name, "General")
+
+def generate_trend_data(current_efficiency: float) -> List[float]:
+    """Generate realistic trend data based on current efficiency"""
+    base = max(50, current_efficiency - 20)
+    return [
+        round(base, 1),
+        round(base + 5, 1),
+        round(base + 10, 1), 
+        round(base + 15, 1),
+        round(base + 18, 1),
+        round(current_efficiency, 1)
+    ]
+
+def generate_efficiency_trend(dept_id: int) -> List[float]:
+    """Generate efficiency trend for a department"""
+    trends = {
+        1: [65, 72, 78, 82, 85, 88.3],
+        2: [70, 75, 80, 85, 90, 92.5],
+        3: [60, 62, 65, 68, 70, 72.8],
+        4: [75, 78, 80, 83, 86, 88.3]
+    }
+    return trends.get(dept_id, [70, 75, 78, 80, 82, 85])
+
+class DepartmentFeedbackRequest(BaseModel):
+    department_id: int
+    feedback_text: str
+    rating: Optional[int] = None
+
+class StatusUpdateRequest(BaseModel):
+    department_id: int
+    issue_ids: List[int]
+    new_status: str
+
+class ResolveIssuesRequest(BaseModel):
+    department_id: int
+    issue_ids: List[int]
+    resolution_notes: str
+
+
+# 1. Get All Departments Summary - CORRECTED VERSION
+# 1. Get All Departments Summary - FIXED VERSION
+@app.get("/api/departments/summary")
+async def get_departments_summary(
+    period: str = Query("month", description="Time period: week, month, year"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get summary for all departments with total issues, resolved, pending, progress counts
+    """
+    try:
+        # Get category to department mapping
+        department_mapping = {
+            "Infrastructure": "Road Dept",
+            "Sanitation": "Sanitation Dept", 
+            "Public Safety": "Public Works",
+            "Utilities": "Water Dept",
+            "Environment": "Electricity Dept"
+        }
+        
+        departments_data = []
+        
+        # Get data for each department category
+        for category_name, dept_name in department_mapping.items():
+            # Get total issues for this category
+            total_result = await db.execute(
+                select(func.count(Report.id))
+                .select_from(Report)
+                .join(Category, Report.category_id == Category.id)
+                .where(Category.name == category_name)
+            )
+            total_issues = total_result.scalar() or 0
+            
+            # Get status counts
+            status_result = await db.execute(
+                select(Status.name, func.count(Report.id))
+                .select_from(Report)
+                .join(Category, Report.category_id == Category.id)
+                .join(Status, Report.status_id == Status.id)
+                .where(Category.name == category_name)
+                .group_by(Status.name)
+            )
+            status_counts = dict(status_result.all())
+            
+            resolved = status_counts.get("Resolved", 0)
+            pending = status_counts.get("Reported", 0)
+            progress = status_counts.get("In Progress", 0)
+            
+            efficiency = round((resolved / total_issues * 100) if total_issues > 0 else 0, 1)
+            
+            departments_data.append({
+                "id": len(departments_data) + 1,
+                "name": dept_name,
+                "icon": get_department_icon(dept_name),
+                "resolved": resolved,
+                "pending": pending,
+                "progress": progress,
+                "efficiency": efficiency,
+                "total_issues": total_issues,
+                "resolution_trend": generate_trend_data(efficiency)
+            })
+        
+        return {
+            "departments": departments_data,
+            "period": period,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching department summary: {str(e)}"
+        )
+    
+# 4. Get Resolution Trend Analysis - FIXED PARAMETER
+@app.get("/api/departments/resolution-trends")
+async def get_resolution_trends(
+    period: str = Query("month", description="Time period: week, month, year")
+    # REMOVED: db: AsyncSession = Depends(get_db) - not needed for static data
+):
+    """
+    Get resolution efficiency trends for all departments over time
+    """
+    try:
+        # For demo purposes - return static data
+        trends = [
+            {
+                "department": "Water Dept",
+                "data": [65.0, 72.0, 78.0, 82.0, 85.0, 85.2],
+                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            },
+            {
+                "department": "Road Dept", 
+                "data": [70.0, 75.0, 80.0, 85.0, 90.0, 92.5],
+                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            },
+            {
+                "department": "Sanitation Dept",
+                "data": [60.0, 62.0, 65.0, 68.0, 70.0, 72.8],
+                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            },
+            {
+                "department": "Electricity Dept",
+                "data": [75.0, 78.0, 80.0, 83.0, 86.0, 88.3],
+                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+            }
+        ]
+        
+        return {"trends": trends}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching resolution trends: {str(e)}"
+        )    
+
+# 2. Get Department Details - CORRECTED VERSION
+@app.get("/api/departments/{dept_id}")
+async def get_department_details(
+    dept_id: int,
+    period: str = Query("month", description="Time period: week, month, year"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get detailed information for a specific department
+    """
+    try:
+        # Get department mapping
+        department_names = {
+            1: "Water Dept",
+            2: "Road Dept", 
+            3: "Sanitation Dept",
+            4: "Electricity Dept",
+            5: "Public Works"
+        }
+        
+        if dept_id not in department_names:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Department not found"
+            )
+        
+        dept_name = department_names[dept_id]
+        category_name = get_category_from_department(dept_name)  # ✅ FIXED: removed self.
+        
+        # Get real statistics for this department/category
+        stats_result = await db.execute(
+            select(
+                Status.name,
+                func.count(Report.id)
+            )
+            .select_from(Report)
+            .join(Category)
+            .join(Status)
+            .filter(Category.name == category_name)
+            .group_by(Status.name)
+        )
+        status_counts = dict(stats_result.all())
+        
+        resolved = status_counts.get("Resolved", 0)
+        pending = status_counts.get("Reported", 0) 
+        progress = status_counts.get("In Progress", 0)
+        total_issues = resolved + pending + progress
+        efficiency = round((resolved / total_issues * 100) if total_issues > 0 else 0, 1)
+        
+        return {
+            "id": dept_id,
+            "name": dept_name,
+            "icon": get_department_icon(dept_name),  # ✅ FIXED: removed self.
+            "resolved": resolved,
+            "pending": pending,
+            "progress": progress,
+            "efficiency": efficiency,
+            "total_issues": total_issues,
+            "efficiency_trend": generate_efficiency_trend(dept_id),  # ✅ FIXED: removed self.
+            "breakdown": {
+                "resolved_percentage": round((resolved / total_issues * 100) if total_issues > 0 else 0, 1),
+                "pending_percentage": round((pending / total_issues * 100) if total_issues > 0 else 0, 1),
+                "progress_percentage": round((progress / total_issues * 100) if total_issues > 0 else 0, 1)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching department details: {str(e)}"
+        )
+
+# 3. Get Issues by Department (for bar chart)
+
+@app.get("/api/departments/issues/by-department")
+async def get_issues_by_department(
+    period: str = Query("month", description="Time period: week, month, year"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get total issues count per department for bar chart
+    """
+    try:
+        # Map categories to department names
+        department_mapping = {
+            "Infrastructure": "Road Dept",
+            "Sanitation": "Sanitation Dept",
+            "Public Safety": "Public Works", 
+            "Utilities": "Water Dept",
+            "Environment": "Electricity Dept"
+        }
+        
+        data = []
+        
+        for category_name, dept_name in department_mapping.items():
+            # Get count for this category
+            count_result = await db.execute(
+                select(func.count(Report.id))
+                .select_from(Report)
+                .join(Category, Report.category_id == Category.id)
+                .where(Category.name == category_name)
+            )
+            count = count_result.scalar() or 0
+            
+            data.append({
+                "department": dept_name,
+                "issues_count": float(count)  # Convert to float for Flutter charts
+            })
+        
+        return {
+            "data": data,
+            "period": period
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching issues by department: {str(e)}"
+        )
+
+# 5. Submit Feedback for Department - REMOVE AUTH
+@app.post("/api/departments/feedback")
+async def submit_department_feedback(
+    feedback: DepartmentFeedbackRequest,
+    db: AsyncSession = Depends(get_db)
+    # REMOVED: current_user: User = Depends(get_current_user)
+):
+    """
+    Submit feedback for a department
+    """
+    try:
+        # In a real app, you'd save this to a department_feedback table
+        return {
+            "message": f"Feedback submitted for department {feedback.department_id}",
+            "feedback_id": 123,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error submitting feedback: {str(e)}"
+        )
+
+# 6. Update Issues Status (Mark as Resolved) - REMOVE AUTH
+@app.post("/api/departments/update-issues-status")
+async def update_issues_status(
+    update: StatusUpdateRequest,
+    db: AsyncSession = Depends(get_db)
+    # REMOVED: current_user: User = Depends(get_current_admin)
+):
+    """
+    Bulk update issues status for a department
+    """
+    try:
+        # Update issues in database
+        for issue_id in update.issue_ids:
+            result = await db.execute(
+                select(Report).filter(Report.id == issue_id)
+            )
+            report = result.scalar_one_or_none()
+            if report:
+                # Get status ID for the new status
+                status_result = await db.execute(
+                    select(Status).filter(Status.name == update.new_status)
+                )
+                status_obj = status_result.scalar_one_or_none()
+                if status_obj:
+                    report.status_id = status_obj.id
+                    report.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        
+        return {
+            "message": f"Updated {len(update.issue_ids)} issues to {update.new_status}",
+            "updated_count": len(update.issue_ids),
+            "department_id": update.department_id
+        }
+        
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating issues status: {str(e)}"
+        )
+
+# 7. Get Department Efficiency Trend
+@app.get("/api/departments/{dept_id}/efficiency-trend")
+async def get_department_efficiency_trend(
+    dept_id: int,
+    months: int = Query(6, ge=1, le=12, description="Number of months for trend"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get efficiency trend for a specific department over months
+    """
+    try:
+        # Mock trend data - in production, calculate from historical data
+        trend_data = {
+            1: [65, 72, 78, 82, 85, 88.3],  # Water Dept
+            2: [70, 75, 80, 85, 90, 92.5],   # Road Dept
+            3: [60, 62, 65, 68, 70, 72.8],   # Sanitation Dept  
+            4: [75, 78, 80, 83, 86, 88.3]    # Electricity Dept
+        }
+        
+        if dept_id not in trend_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Department not found"
+            )
+        
+        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        
+        return {
+            "department_id": dept_id,
+            "efficiency_trend": trend_data[dept_id][-months:],
+            "months": month_names[-months:],
+            "current_efficiency": trend_data[dept_id][-1]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching efficiency trend: {str(e)}"
+        )
