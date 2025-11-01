@@ -68,6 +68,9 @@ class Report(Base):
     description = Column(Text, nullable=False)
     category = Column(String(50), nullable=False)     # Added length limit
     urgency_level = Column(String(20), nullable=False) # Added length limit
+
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)  # ✅ Add this
+    status_id = Column(Integer, ForeignKey("statuses.id"), nullable=True)      # ✅ Add this 
     
     # Status Information
     status = Column(String(20), default="Pending")    # Added length limit
@@ -96,3 +99,68 @@ class Report(Base):
     
     # Relationships
     user = relationship("User", back_populates="reports")
+
+# ========== DEPARTMENT ANALYSIS MODELS ==========
+
+class Department(Base):
+    __tablename__ = "departments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, index=True, nullable=False)
+    description = Column(Text)
+    icon = Column(String(50))  # Icon name for frontend
+    email = Column(String(255))
+    phone = Column(String(20))
+    head_name = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    stats = relationship("DepartmentStats", back_populates="department")
+    feedback = relationship("DepartmentFeedback", back_populates="department")
+
+class DepartmentStats(Base):
+    __tablename__ = "department_stats"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True)
+    
+    # Statistics
+    total_issues = Column(Integer, default=0)
+    resolved_issues = Column(Integer, default=0)
+    pending_issues = Column(Integer, default=0)
+    in_progress_issues = Column(Integer, default=0)
+    efficiency_score = Column(Float, default=0.0)  # Percentage
+    
+    # Time period
+    period = Column(String(20))  # 'week', 'month', 'year'
+    period_start = Column(DateTime)
+    period_end = Column(DateTime)
+    
+    # Timestamps
+    calculated_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    department = relationship("Department", back_populates="stats")
+
+class DepartmentFeedback(Base):
+    __tablename__ = "department_feedback"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Feedback content
+    feedback_text = Column(Text, nullable=False)
+    rating = Column(Integer)  # 1-5 scale
+    user_name = Column(String(255))  # Store name if user not registered
+    
+    # Status
+    status = Column(String(20), default="Pending")  # Pending, Reviewed, Actioned
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    department = relationship("Department", back_populates="feedback")
+    user = relationship("User")
