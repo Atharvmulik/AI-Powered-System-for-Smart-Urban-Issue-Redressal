@@ -80,12 +80,11 @@ class ReportCreate(BaseModel):
     user_name: str
     user_mobile: str
     user_email: Optional[str] = None
+    urgency_level: str
     title: str
     description: str
-    category: str  # Garbage, Water, Sanitation, Other
-    urgency_level: str  # Low, Medium, High, Urgent
-    location_lat: float  
-    location_long: float  
+    location_lat: float
+    location_long: float
     location_address: Optional[str] = None
     
     @validator('user_name')
@@ -102,12 +101,12 @@ class ReportCreate(BaseModel):
             raise ValueError('Mobile number must be exactly 10 digits')
         return v
 
-    @validator('category')
-    def validate_category(cls, v):
-        valid_categories = ["Garbage", "Water", "Sanitation", "Other"]
-        if v not in valid_categories:
-            raise ValueError(f'Category must be one of: {", ".join(valid_categories)}')
-        return v
+    # @validator('category')
+    # def validate_category(cls, v):
+    #     valid_categories = ["Garbage", "Water", "Sanitation", "Other"]
+    #     if v not in valid_categories:
+    #         raise ValueError(f'Category must be one of: {", ".join(valid_categories)}')
+    #     return v
 
     @validator('urgency_level')
     def validate_urgency_level(cls, v):

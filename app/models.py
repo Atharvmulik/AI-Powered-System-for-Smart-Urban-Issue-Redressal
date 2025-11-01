@@ -59,38 +59,40 @@ class Report(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # User Information
-    user_name = Column(String(255), nullable=False)  # Added length limit
-    user_mobile = Column(String(15), nullable=False)  # Increased length for international numbers
-    user_email = Column(String(255), nullable=True)   # Added length limit
+    user_name = Column(String(255), nullable=False)
+    user_mobile = Column(String(15), nullable=False)
+    user_email = Column(String(255), nullable=True)
 
     # Issue Information
-    title = Column(String(255), nullable=False)       # Added length limit
+    title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
-    category = Column(String(50), nullable=False)     # Added length limit
-    urgency_level = Column(String(20), nullable=False) # Added length limit
+    issue_type = Column(String(50), nullable=False, default="General")  # ✅ Add default
+    category = Column(String(50), nullable=False, default="General")    # ✅ Add default
+    urgency_level = Column(String(20), nullable=False)
 
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)  # ✅ Add this
-    status_id = Column(Integer, ForeignKey("statuses.id"), nullable=True)      # ✅ Add this 
+    # Foreign keys
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    status_id = Column(Integer, ForeignKey("statuses.id"), nullable=True)
     
     # Status Information
-    status = Column(String(20), default="Pending")    # Added length limit
+    status = Column(String(20), default="Pending")
     
     # Location Information
     location_lat = Column(Float, nullable=False)
     location_long = Column(Float, nullable=False)
     location_address = Column(Text, nullable=True)
-    distance = Column(Float, nullable=True)  # Distance in km
+    distance = Column(Float, nullable=True)
     
     # Admin Assignment
-    assigned_department = Column(String(100), nullable=True)  # Added length limit
+    assigned_department = Column(String(100), nullable=True)
     resolution_notes = Column(Text, nullable=True)
-    resolved_by = Column(String(255), nullable=True)  # Added length limit
+    resolved_by = Column(String(255), nullable=True)
     
     # Media Files
-    images = Column(Text, nullable=True)  # JSON string or comma-separated paths
-    voice_note = Column(String(500), nullable=True)  # Added length limit for file path
+    images = Column(Text, nullable=True)
+    voice_note = Column(String(500), nullable=True)
     
-    # Timestamps - Improved with server_default
+    # Timestamps
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
@@ -99,7 +101,7 @@ class Report(Base):
     
     # Relationships
     user = relationship("User", back_populates="reports")
-
+    
 # ========== DEPARTMENT ANALYSIS MODELS ==========
 
 class Department(Base):
