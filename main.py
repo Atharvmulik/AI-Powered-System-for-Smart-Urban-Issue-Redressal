@@ -245,7 +245,6 @@ async def read_reports(
     reports = result.scalars().all()
     return reports
 
-# ✅ UPDATED: Report creation endpoint with urgency level
 @app.post("/reports/")
 async def create_report(
     report_data: ReportCreate,
@@ -259,39 +258,23 @@ async def create_report(
                 detail="Location coordinates are required"
             )
 
-        # Get or create a default category (since we removed issue_type)
-        result = await db.execute(select(Category).filter(Category.name == "General"))
-        category = result.scalar_one_or_none()
-        if not category:
-            category = Category(name="General", description="General issues category")
-            db.add(category)
-            await db.commit()
-            await db.refresh(category)
-        
-        # Get the default status
-        result = await db.execute(select(Status).filter(Status.name == "Reported"))
-        status_obj = result.scalar_one_or_none()
-        if not status_obj:
-            status_obj = Status(name="Reported", description="Issue has been reported")
-            db.add(status_obj)
-            await db.commit()
-            await db.refresh(status_obj)
-        
-        # Create report with urgency level
+        # Create report with default values for required database columns
         db_report = Report(
             user_name=report_data.user_name,
             user_mobile=report_data.user_mobile,
             user_email=report_data.user_email,
-            issue_type=report_data.urgency_level,  # Store urgency as issue_type for now
+            urgency_level=report_data.urgency_level,
             title=report_data.title,
             description=report_data.description,
+            # ✅ Provide defaults for database-required columns
+            issue_type="General",  # Default value for database
+            category="General",    # Default value for database
             location_lat=report_data.location_lat,
             location_long=report_data.location_long,
             location_address=report_data.location_address,
-            category_id=category.id,
-            status_id=status_obj.id,
+            status="Pending"
         )
-        
+
         db.add(db_report)
         await db.commit()
         await db.refresh(db_report)
@@ -311,6 +294,7 @@ async def create_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,  
             detail=f"Error creating report: {str(e)}"
         )
+    
 
 @app.get("/reports/{report_id}")
 async def get_report(
@@ -845,63 +829,73 @@ async def get_category_summary(db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching category summary: {str(e)}"
         )
-
-
+    
 @app.get("/users/reports/filtered")
 async def get_user_reports_filtered(
     status_filter: str = Query("all", description="Filter by status: all, active, resolved"),
     user_email: str = Query(..., description="User email to filter reports"),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Returns user's reports with filtering and search capability
-    For "My Complaints" page (2nd image) - Public access
-    """
     try:
-        # Start with base query and eager load relationships
-        base_query = select(Report).options(
-            selectinload(Report.category),
-            selectinload(Report.status)
-        ).filter(Report.user_email == user_email)
+        print(f"🔍 Fetching reports for user: {user_email}, filter: {status_filter}")
         
-        # Apply status filter
-        if status_filter == "active":
-            base_query = base_query.join(Status).filter(Status.name.in_(["Reported", "In Progress"]))
-        elif status_filter == "resolved":
-            base_query = base_query.join(Status).filter(Status.name == "Resolved")
-        
-        # Order by latest first
-        base_query = base_query.order_by(Report.created_at.desc())
-        
-        result = await db.execute(base_query)
-        user_reports = result.scalars().all()
-        
-        # Format response for frontend
-        formatted_reports = []
-        for report in user_reports:
-            report_data = {
-                "id": report.id,
-                "complaint_id": f"#{report.id:05d}",
-                "title": report.title,
-                "description": report.description,
-                "date": report.created_at.strftime("%d %b. %I:%M %p"),
-                "category": report.category.name if report.category else "General",
-                "status": report.status.name if report.status else "Reported",
-                "urgency_level": report.issue_type,
-                "location_address": report.location_address,
-                "user_name": report.user_name,
-                "user_email": report.user_email
-            }
-            formatted_reports.append(report_data)
-        
+        result = await db.execute(
+            select(Report)
+            .filter(Report.user_email == user_email)
+            .order_by(Report.created_at.desc())
+        )
+        reports = result.scalars().all()
+        print(f"✅ Found {len(reports)} reports for user {user_email}")
+
+        formatted = []
+        for r in reports:
+            # category
+            category = None
+            if r.category_id:
+                cat_res = await db.execute(select(Category).filter(Category.id == r.category_id))
+                category = cat_res.scalar_one_or_none()
+
+            # status
+            status_obj = None
+            if r.status_id:
+                stat_res = await db.execute(select(Status).filter(Status.id == r.status_id))
+                status_obj = stat_res.scalar_one_or_none()
+
+            # filtering
+            should_include = True
+            status_name = status_obj.name if status_obj else "Reported"
+
+            if status_filter == "active" and status_name not in ["Reported", "In Progress"]:
+                should_include = False
+            elif status_filter == "resolved" and status_name != "Resolved":
+                should_include = False
+
+            if should_include:
+                formatted.append({
+                    "id": r.id,
+                    "complaint_id": f"#{r.id:05d}",
+                    "title": r.title,
+                    "description": r.description,
+                    "date": r.created_at.strftime("%d %b. %I:%M %p") if r.created_at else None,
+                    "category": category.name if category else "General",
+                    "status": status_name,
+                    "urgency_level": r.urgency_level,
+                    "location_address": r.location_address,
+                    "user_name": r.user_name,
+                    "user_email": r.user_email
+                })
+
         return {
-            "total_complaints": len(formatted_reports),
+            "total_complaints": len(formatted),
             "filter": status_filter,
             "user_email": user_email,
-            "complaints": formatted_reports
+            "complaints": formatted
         }
-        
+
     except Exception as e:
+        import traceback
+        print(f"❌ Error: {e}")
+        print(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching user reports: {str(e)}"
@@ -911,7 +905,7 @@ async def get_user_reports_filtered(
 @app.get("/users/reports/search")
 async def search_user_reports(
     query: str = Query(..., description="Search by complaint ID or text"),
-    user_email: str = Query(..., description="User email to search reports"),
+    user_email: str = Query(..., description="User email to search reports"),  # CHANGED BACK: Made mandatory
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -919,6 +913,8 @@ async def search_user_reports(
     For search functionality in "My Complaints" page - Public access
     """
     try:
+        print(f"🔍 Searching reports for user: {user_email}, query: {query}")
+        
         # Check if query is a complaint ID (format: #12345 or 12345)
         complaint_id = None
         if query.startswith('#'):
@@ -932,10 +928,8 @@ async def search_user_reports(
             except ValueError:
                 complaint_id = None
         
-        base_query = select(Report).options(
-            selectinload(Report.category),
-            selectinload(Report.status)
-        ).filter(Report.user_email == user_email)
+        # Base query - user can only see their own reports
+        base_query = select(Report).filter(Report.user_email == user_email)
         
         if complaint_id:
             # Search by exact ID
@@ -953,16 +947,29 @@ async def search_user_reports(
         result = await db.execute(base_query)
         search_results = result.scalars().all()
         
+        print(f"✅ Found {len(search_results)} search results")
+        
         formatted_results = []
         for report in search_results:
+            # Get category and status for each report
+            category_result = await db.execute(
+                select(Category).filter(Category.id == report.category_id)
+            )
+            category = category_result.scalar_one_or_none()
+            
+            status_result = await db.execute(
+                select(Status).filter(Status.id == report.status_id)
+            )
+            status = status_result.scalar_one_or_none()
+            
             report_data = {
                 "id": report.id,
                 "complaint_id": f"#{report.id:05d}",
                 "title": report.title,
                 "description": report.description,
                 "date": report.created_at.strftime("%d %b. %I:%M %p"),
-                "category": report.category.name if report.category else "General",
-                "status": report.status.name if report.status else "Reported",
+                "category": category.name if category else "General",
+                "status": status.name if status else "Reported",
                 "location_address": report.location_address,
                 "user_name": report.user_name,
                 "user_email": report.user_email
@@ -977,6 +984,7 @@ async def search_user_reports(
         }
         
     except Exception as e:
+        print(f"❌ Error in search endpoint: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error searching reports: {str(e)}"
@@ -992,22 +1000,40 @@ async def get_report_timeline(
     For individual complaint tracking page (3rd image) - Public access
     """
     try:
-        # Get the report with eager loading of relationships
-        result = await db.execute(
-            select(Report)
-            .options(
-                selectinload(Report.category),
-                selectinload(Report.status)
-            )
-            .filter(Report.id == report_id)
+        print(f"🔍 Fetching timeline for report ID: {report_id}")
+        
+        # Simple query to check if report exists
+        report_result = await db.execute(
+            select(Report).filter(Report.id == report_id)
         )
-        report = result.scalar_one_or_none()
+        report = report_result.scalar_one_or_none()
         
         if not report:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Report with ID {report_id} not found"
             )
+        
+        print(f"✅ Found report: {report.title}")
+        
+        # Get category
+        category = None
+        if report.category_id:
+            category_result = await db.execute(
+                select(Category).filter(Category.id == report.category_id)
+            )
+            category = category_result.scalar_one_or_none()
+        
+        # Get status
+        status = None
+        if report.status_id:
+            status_result = await db.execute(
+                select(Status).filter(Status.id == report.status_id)
+            )
+            status = status_result.scalar_one_or_none()
+        
+        print(f"📊 Category: {category.name if category else 'None'}")
+        print(f"📊 Status: {status.name if status else 'None'}")
         
         # Build timeline events
         timeline_events = []
@@ -1021,28 +1047,28 @@ async def get_report_timeline(
         })
         
         # Event 2: Assigned to Department (simulate based on status)
-        if report.status and report.status.name in ["In Progress", "Resolved", "Closed"]:
+        if status and status.name in ["In Progress", "Resolved", "Closed"]:
             assigned_time = report.created_at + timedelta(hours=2)
             timeline_events.append({
                 "event": "Assigned to Department",
-                "description": f"Assigned to {report.category.name if report.category else 'Public Works Department'}",
+                "description": f"Assigned to {category.name if category else 'Public Works Department'}",
                 "timestamp": assigned_time.isoformat(),
                 "status": "completed"
             })
         
         # Event 3: Work in Progress
-        if report.status and report.status.name in ["In Progress", "Resolved", "Closed"]:
+        if status and status.name in ["In Progress", "Resolved", "Closed"]:
             work_start_time = report.created_at + timedelta(hours=4)
             expected_resolution = report.created_at + timedelta(days=2)
             timeline_events.append({
                 "event": "Work in Progress",
                 "description": f"Work is in progress. Expected resolution: {expected_resolution.strftime('%d %b')}",
                 "timestamp": work_start_time.isoformat(),
-                "status": "completed" if report.status.name in ["Resolved", "Closed"] else "in_progress"
+                "status": "completed" if status.name in ["Resolved", "Closed"] else "in_progress"
             })
         
         # Event 4: Resolved
-        if report.status and report.status.name in ["Resolved", "Closed"]:
+        if status and status.name in ["Resolved", "Closed"]:
             resolved_time = report.updated_at if report.updated_at else report.created_at + timedelta(days=2)
             timeline_events.append({
                 "event": "Resolved",
@@ -1062,10 +1088,10 @@ async def get_report_timeline(
                 "title": report.title,
                 "description": report.description,
                 "submitted_on": report.created_at.strftime("%d %b. %I:%M %p"),
-                "category": report.category.name if report.category else "Road Maintenance",
+                "category": category.name if category else "Road Maintenance",
                 "department": "Public Works Department",
-                "urgency_level": report.issue_type,
-                "current_status": report.status.name if report.status else "Reported",
+                "urgency_level": report.urgency_level,
+                "current_status": status.name if status else "Reported",
                 "location_address": report.location_address,
                 "location_lat": report.location_lat,
                 "location_long": report.location_long,
@@ -1076,18 +1102,21 @@ async def get_report_timeline(
             "confirmation_count": getattr(report, 'confirmation_count', 0)
         }
         
+        print(f"✅ Successfully built timeline with {len(timeline_events)} events")
         return response_data
         
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ Error in timeline endpoint: {str(e)}")
+        print(f"❌ Error type: {type(e)}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching report timeline: {str(e)}"
         )
-    
-
-
 
 # admin endpoints
 
@@ -1657,4 +1686,62 @@ async def get_department_efficiency_trend(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching efficiency trend: {str(e)}"
+        )
+
+
+
+
+
+@app.get("/debug/check-user-reports")
+async def debug_check_user_reports(
+    user_email: str = Query(..., description="User email to check"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Debug endpoint to check exact user reports
+    """
+    try:
+        print(f"🔍 DEBUG: Checking exact matches for email: {user_email}")
+        
+        # Check exact email match
+        exact_result = await db.execute(
+            select(Report)
+            .filter(Report.user_email == user_email)
+        )
+        exact_reports = exact_result.scalars().all()
+        
+        # Also check if there are any similar emails
+        similar_result = await db.execute(
+            select(Report.user_email, func.count(Report.id))
+            .group_by(Report.user_email)
+        )
+        all_emails = similar_result.all()
+        
+        report_details = []
+        for report in exact_reports:
+            report_details.append({
+                "id": report.id,
+                "title": report.title,
+                "user_email": report.user_email,
+                "user_name": report.user_name,
+                "created_at": report.created_at.isoformat(),
+                "category_id": report.category_id,
+                "status_id": report.status_id
+            })
+        
+        return {
+            "searching_for_email": user_email,
+            "exact_match_count": len(exact_reports),
+            "exact_reports": report_details,
+            "all_emails_in_database": [{"email": email, "count": count} for email, count in all_emails],
+            "message": f"Found {len(exact_reports)} exact matches for {user_email}"
+        }
+        
+    except Exception as e:
+        print(f"❌ DEBUG Error: {str(e)}")
+        import traceback
+        print(f"❌ DEBUG Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Debug error: {str(e)}"
         )
