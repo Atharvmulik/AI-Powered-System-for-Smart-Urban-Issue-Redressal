@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../guide/guide.dart';
 import '../track/trackissueimage.dart';
 import '../report/issuereport.dart' as report;
-import '/services/issue_service.dart';
+import '../../services/api_service.dart'; 
+import 'dart:convert'; 
 
 class DashboardScreen extends StatefulWidget {
   final String userEmail;
@@ -24,8 +25,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool isLoading = true;
   int _bottomIndex = 0;
   double resolvedPctToday = 0.62;
-
-  final IssueService _issueService = IssueService();
 
   final categories = const [
     _IssueCategory('Pothole', Icons.traffic),
@@ -56,37 +55,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _loadIssues() async {
-    try {
-      // ✅ FIXED: Use instance method instead of static access
-      final response = await _issueService.getIssues();
-      
-      if (mounted) {
-        setState(() {
-          if (response['success']) {
-            reportedIssues = response['data'] ?? [];
-          } else {
-            // Handle error case
-            reportedIssues = [];
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to load issues: ${response['error']}')),
-            );
-          }
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
+  try {
+    final ApiService apiService = ApiService(); // Create instance
+    final response = await apiService.getUserReportsForDashboard(widget.userEmail);
+    
+    if (mounted) {
+      setState(() {
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          reportedIssues = data['complaints'] ?? [];
+        } else {
+          // Handle error case
           reportedIssues = [];
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load issues: $e')),
-        );
-      }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load issues: ${response.statusCode}')),
+          );
+        }
+        isLoading = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+        reportedIssues = [];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load issues: $e')),
+      );
     }
   }
-
+}
   double _getUrgencyValue(String urgency) {
     switch (urgency.toLowerCase()) {
       case 'high': return 0.9;

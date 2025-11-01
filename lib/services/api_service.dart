@@ -292,6 +292,23 @@ class ApiService {
     return await get(ApiConfig.categorySummary);
   }
 
+  // 1. NEW - For dashboard
+Future<http.Response> getUserReportsForDashboard(String userEmail) async {
+  return await getWithParams('/users/reports/filtered', {
+    'user_email': userEmail,
+    'status_filter': 'all',
+  });
+}
+
+// 2. NEW - For filtering
+Future<http.Response> getUserReports(String userEmail, {String statusFilter = 'all'}) async {
+  return await getWithParams('/users/reports/filtered', {
+    'user_email': userEmail,
+    'status_filter': statusFilter,
+  });
+}
+
+
   // Nearby Issues (PUBLIC)
   Future<http.Response> getNearbyIssues(double lat, double lng, {double radius = 5.0}) async {
     return await getWithParams(ApiConfig.nearbyIssues, {
@@ -376,3 +393,6 @@ class ApiService {
     return response.statusCode >= 200 && response.statusCode < 300;
   }
 }
+
+
+
