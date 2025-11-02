@@ -5,7 +5,6 @@ import '/services/location_service.dart';
 import 'dart:async'; 
 import 'dart:io';
 
-
 const _indigo = Colors.indigo;
 const _green = Colors.green;
 const _red = Colors.red;
@@ -36,6 +35,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   double? _currentLong;
   String? _currentAddress;
   bool _isLoadingLocation = false;
+  String _locationError = '';
 
   // Image variables
   File? _selectedImage;
@@ -58,6 +58,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     _textDescription.dispose();
     super.dispose();
   }
+
   // ====== simple validations ====
   bool _validateRequired() {
     return _name.text.isNotEmpty &&
@@ -68,89 +69,81 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   }
 
   // ====== LOCATION FUNCTIONALITY ======
-Future<void> _getCurrentLocation() async {
-  if (!mounted) return;
-  
-  setState(() {
-    _isLoadingLocation = true;
-  });
-
-  try {
-    print('🔄 Starting location request...');
+  Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     
-    // Add timeout to prevent freezing
-    LocationResult result = await LocationService.getCurrentLocation()
-        .timeout(Duration(seconds: 30), onTimeout: () {
-      print('⏰ Location request timed out');
-      return LocationResult(
-        success: false,
-        error: 'Location request timed out. Please try again.',
-        requiresPermissionRequest: false,
-      );
+    setState(() {
+      _isLoadingLocation = true;
+      _locationError = '';
     });
 
-    if (!mounted) return;
+    try {
+      print('🔄 Starting location request...');
+      
+      // First check if we have basic permissions
+      bool hasPermission = await LocationService.hasLocationPermission();
+      if (!hasPermission) {
+        print('⚠️ No location permission, requesting...');
+      }
 
-    if (result.success) {
-      print('✅ Location captured successfully');
-      setState(() {
-        _currentLat = result.latitude;
-        _currentLong = result.longitude;
-        _currentAddress = result.address ?? "Location: ${result.latitude!.toStringAsFixed(6)}, ${result.longitude!.toStringAsFixed(6)}";
-        _locationChoice = '📍 Current location';
-        _isLoadingLocation = false;
-      });
+      LocationResult result = await LocationService.getCurrentLocation();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('📍 Location captured successfully!')),
-      );
-    } else {
-      print('❌ Location failed: ${result.error}');
-      setState(() {
-        _isLoadingLocation = false;
-      });
+      if (!mounted) return;
 
-      if (result.requiresPermissionRequest) {
-        bool? requestPermission = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Location Permission Required'),
-            content: const Text('This app needs location access to capture your current location for issue reporting.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Deny'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Allow'),
-              ),
-            ],
+      if (result.success) {
+        print('✅ Location captured: ${result.latitude}, ${result.longitude}');
+        setState(() {
+          _currentLat = result.latitude;
+          _currentLong = result.longitude;
+          _currentAddress = result.address ?? "Location captured";
+          _locationChoice = '📍 Current location';
+          _isLoadingLocation = false;
+          _locationError = '';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📍 Location captured successfully!'),
+            duration: Duration(seconds: 2),
           ),
         );
-        
-        if (requestPermission == true) {
-          await _getCurrentLocation();
-        }
       } else {
+        print('❌ Location failed: ${result.error}');
+        setState(() {
+          _isLoadingLocation = false;
+          _locationError = result.error ?? 'Failed to get location';
+        });
+
+        // Show error to user
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location error: ${result.error}')),
+          SnackBar(
+            content: Text('Location error: ${result.error}'),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => LocationService.openAppSettings(),
+            ),
+          ),
+        );
+      }
+
+    } catch (e) {
+      print('💥 Unexpected error in _getCurrentLocation: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+          _locationError = 'Unexpected error: $e';
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     }
-
-  } catch (e) {
-    print('💥 Error in _getCurrentLocation: $e');
-    if (mounted) {
-      setState(() {
-        _isLoadingLocation = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error getting location: $e')),
-      );
-    }
   }
-}
 
   // ====== IMAGE UPLOAD FUNCTIONALITY ======
   Future<void> _showImageSourceDialog() async {
@@ -256,6 +249,7 @@ Future<void> _getCurrentLocation() async {
         setState(() {
           _locationChoice = '✏️ Manual location';
           _showManualLocation = true;
+          _locationError = '';
         });
       }
     });
@@ -268,14 +262,15 @@ Future<void> _getCurrentLocation() async {
       return;
     }
 
-    if (_locationChoice != null && _locationChoice!.contains('Current') && _currentLat == null) {
+    // Validate location based on choice
+    if (_locationChoice == '📍 Current location' && (_currentLat == null || _currentLong == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please wait for location to be captured or select another location option.')),
       );
       return;
     }
 
-    if (_locationChoice != null && _locationChoice!.contains('Manual') && _manualLocation.text.isEmpty) {
+    if (_locationChoice == '✏️ Manual location' && _manualLocation.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter manual location details.')),
       );
@@ -293,18 +288,20 @@ Future<void> _getCurrentLocation() async {
       double latitude;
       double longitude;
       
-      if (_currentLat != null && _currentLong != null) {
+      if (_locationChoice == '📍 Current location' && _currentLat != null && _currentLong != null) {
         locationAddress = _currentAddress ?? "Current Location (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})";
         latitude = _currentLat!;
         longitude = _currentLong!;
-      } else if (_manualLocation.text.isNotEmpty) {
+      } else if (_locationChoice == '✏️ Manual location' && _manualLocation.text.isNotEmpty) {
         locationAddress = _manualLocation.text;
         latitude = 0.0;
         longitude = 0.0;
       } else {
-        locationAddress = 'Location not specified';
-        latitude = 0.0;
-        longitude = 0.0;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please provide a valid location.')),
+        );
+        if (mounted) Navigator.pop(context);
+        return;
       }
 
       // Prepare report data
@@ -542,6 +539,7 @@ Future<void> _getCurrentLocation() async {
                 child: _MenuTile(valueText: _locationChoice ?? 'Select location option…', onTap: _showLocationMenu),
               ),
               
+              // Location Loading State
               if (_isLoadingLocation)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -551,16 +549,104 @@ Future<void> _getCurrentLocation() async {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.blue.shade200),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      const CircularProgressIndicator(strokeWidth: 2),
-                      const SizedBox(width: 12),
-                      Text('Getting your current location...', 
-                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue.shade800)),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade700),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Getting your current location...', 
+                              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue.shade800),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'This may take a few seconds',
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.blue.shade600),
+                      ),
                     ],
                   ),
                 ),
 
+              // Location Error State
+              if (_locationError.isNotEmpty && !_isLoadingLocation)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Location Error', 
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _locationError,
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.red.shade700),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _getCurrentLocation,
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: const Text('Try Again'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red.shade700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _locationChoice = '✏️ Manual location';
+                                  _showManualLocation = true;
+                                  _locationError = '';
+                                });
+                              },
+                              icon: const Icon(Icons.edit_location_alt, size: 16),
+                              label: const Text('Enter Manually'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.blue.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Location Success State
               if (_currentLat != null && _currentLong != null)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -591,6 +677,7 @@ Future<void> _getCurrentLocation() async {
                   ),
                 ),
 
+              // Manual Location Input
               if (_showManualLocation)
                 _FieldCard(
                   label: 'Enter location manually *',
@@ -891,12 +978,12 @@ class _FieldCard extends StatelessWidget {
 class _MenuTile extends StatelessWidget {
   final String valueText;
   final VoidCallback onTap;
-  final Widget? trailing; // Add trailing parameter
+  final Widget? trailing;
   
   const _MenuTile({
     required this.valueText, 
     required this.onTap,
-    this.trailing, // Make it optional
+    this.trailing,
   });
   
   @override
@@ -904,7 +991,7 @@ class _MenuTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(valueText),
-      trailing: trailing ?? const Icon(Icons.expand_more_rounded), // Use custom trailing or default icon
+      trailing: trailing ?? const Icon(Icons.expand_more_rounded),
       onTap: onTap,
       dense: true,
       visualDensity: VisualDensity.compact,

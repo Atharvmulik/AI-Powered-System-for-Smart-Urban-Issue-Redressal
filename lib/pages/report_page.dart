@@ -98,8 +98,8 @@ class _LoginSignupPageState extends State<LoginSignupPage>
         // 🔍 EXTENSIVE DEBUGGING
         print('🎯 FULL RESULT OBJECT:');
         print('   - Entire result: $result');
-        print('   - Success: ${result['success']} (type: ${result['success'].runtimeType})');
-        print('   - is_admin: ${result['is_admin']} (type: ${result['is_admin'].runtimeType})');
+        print('   - Success: ${result['success']}');
+        print('   - is_admin: ${result['is_admin']}');
         print('   - Error: ${result['error']}');
         print('   - Email: ${result['email']}');
         print('   - User Name: ${result['user_name']}');
@@ -113,25 +113,30 @@ class _LoginSignupPageState extends State<LoginSignupPage>
           );
           
           // Get user data from result
-          final dynamic isAdminRaw = result['is_admin'];
-          final bool isAdmin = isAdminRaw == true || isAdminRaw == 'true' || isAdminRaw == 1;
+          final String userEmail = result['email'] ?? emailController.text.trim();
           final String userName = result['user_name'] ?? 
               (isLogin ? 'User' : nameController.text.trim());
-          final String userEmail = result['email'] ?? emailController.text.trim();
           
-          // 🔍 CRITICAL DEBUG INFO
-          print('🎯 FINAL NAVIGATION ANALYSIS:');
-          print('   - Raw is_admin value: $isAdminRaw');
-          print('   - Final isAdmin boolean: $isAdmin');
+          // 🔍 CRITICAL: FIX ADMIN DETECTION
+          final bool isAdmin = _authService.isAdminEmail(userEmail);
+          
+          // 🔍 DEBUG ADMIN DETECTION
+          print('🎯 ADMIN DETECTION DEBUG:');
           print('   - User Email: $userEmail');
-          print('   - Is admin email: ${emailController.text.trim().contains('admin')}');
+          print('   - Is Admin Email: $isAdmin');
+          print('   - Admin Emails List: ${AuthService.adminUsers}'); // ✅ FIXED: Use static access
           
-          // Navigate based on user type using DIRECT navigation
+          // Navigate based on user type
           if (isAdmin) {
             print('🚀 ADMIN DETECTED - REDIRECTING TO ADMIN DASHBOARD');
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+              MaterialPageRoute(
+                builder: (context) => AdminDashboardPage(
+                  userEmail: userEmail,
+                  userName: userName,
+                ),
+              ),
               (route) => false,
             );
           } else {

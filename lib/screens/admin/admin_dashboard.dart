@@ -3,9 +3,17 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../pages/report_page.dart';
 import '../../pages/view_issue_admin.dart';
 import '../../pages/dept_analysis.dart';
+import '../../pages/admin_profile.dart';
 
 class AdminDashboardPage extends StatefulWidget {
-  const AdminDashboardPage({super.key});
+  final String userEmail;
+  final String userName;
+  
+  const AdminDashboardPage({
+    super.key,
+    required this.userEmail,
+    required this.userName,
+  });
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
@@ -33,20 +41,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   void _onNavTapped(int index) {
-  if (index == 2) { // Issue Reports index
-    // Navigate to ViewIssueAdminPage when Issue Reports is tapped
+  if (index == 4) { 
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfilePage(
+          userEmail: widget.userEmail, // Use widget.userEmail
+          userName: widget.userName,   // Use widget.userName
+        ),
+      ),
+    );
+  }  
+  else if (index == 2) { // Issue Reports index
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const IssueTrackingPage()),
     );
   } else if (index == 1) { // Department Analysis index
-    // Navigate to DepartmentAnalysisPage when Dept Analysis is tapped
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const DepartmentAnalysisPage()),
     );
   } else {
-    // For other tabs (Dashboard, Map View, Profile), use the existing page switching
     setState(() => _selectedIndex = index);
   }
 }
@@ -123,17 +139,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   color: Colors.deepPurple, size: 36),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(  // Remove 'const'
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Hello, Vaishnavi 👋",
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple)),
-                  SizedBox(height: 6),
-                  Text("Monitor and manage city issues efficiently",
+                  Text("Hello, ${widget.userName.split(' ').last} 👋",  // ✅ Dynamic value
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.deepPurple)),
+                  const SizedBox(height: 6),
+                  const Text("Monitor and manage city issues efficiently",
                       style: TextStyle(
                           color: Colors.black54,
                           fontSize: 15,

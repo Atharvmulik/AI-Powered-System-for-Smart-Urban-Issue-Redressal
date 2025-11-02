@@ -6,97 +6,121 @@ class AuthService {
   final ApiService _apiService = ApiService();
   
   // Define admin emails - ONLY these can access admin dashboard
-  static const List<String> adminEmails = [
-    'admin1@civiceye.com',
-    'admin2@civiceye.com', 
-    'admin3@civiceye.com',
-    'admin4@civiceye.com',
-    'vaishnavi@civiceye.com'
+  static const List<Map<String, String>> adminUsers = [
+    {'email': 'admin1@civiceye.com', 'name': 'Admin Rohan Sharma'},
+    {'email': 'admin2@civiceye.com', 'name': 'Admin Priya Patel'},
+    {'email': 'admin3@civiceye.com', 'name': 'Admin Amit Kumar'},
+    {'email': 'admin4@civiceye.com', 'name': 'Admin Neha Singh'},
+    {'email': 'vaishnavi@civiceye.com', 'name': 'Admin Vaishnavi Nie'},
   ];
 
-  // Check if email is admin
+  // Check if email is admin - CORRECTED
   bool isAdminEmail(String email) {
-    final isAdmin = adminEmails.contains(email.toLowerCase());
+    final cleanEmail = email.toLowerCase().trim();
+    final isAdmin = adminUsers.any((admin) => admin['email'] == cleanEmail);
+    
     print('🔍 Admin email check:');
     print('   - Input email: $email');
-    print('   - Lowercase: ${email.toLowerCase()}');
-    print('   - Admin emails list: $adminEmails');
+    print('   - Clean email: $cleanEmail');
     print('   - Is admin: $isAdmin');
+    
     return isAdmin;
   }
+
+  // Get admin user details - CORRECTED
+  static Map<String, String>? getAdminUser(String email) {
+    final cleanEmail = email.toLowerCase().trim();
+    for (var admin in adminUsers) {
+      if (admin['email'] == cleanEmail) {
+        return admin;
+      }
+    }
+    return null;
+  }
+
+  // Get admin name by email
+  String getAdminName(String email) {
+    final admin = getAdminUser(email);
+    return admin?['name'] ?? 'Admin User';
+  }
+
   // Login user - CORRECTED VERSION
   Future<Map<String, dynamic>> login(String email, String password) async {
-  try {
-    print('🔐 Login attempt for: $email');
-    print('👑 Is admin email: ${isAdminEmail(email)}');
-    
-    // Handle admin login completely in frontend (no API call for admin)
-    if (isAdminEmail(email)) {
-      print('👑 ADMIN EMAIL DETECTED - Checking password...');
-      if (password == 'admin123') { 
-        print('✅ ADMIN LOGIN SUCCESSFUL - Returning is_admin: true');
-        return {
-          'success': true,
-          'is_admin': true,  // ← This MUST be true for admin
-          'user_name': 'Admin User',
+    try {
+      print('🔐 Login attempt for: $email');
+      print('👑 Is admin email: ${isAdminEmail(email)}');
+      
+      // Handle admin login completely in frontend (no API call for admin)
+      if (isAdminEmail(email)) {
+        print('👑 ADMIN EMAIL DETECTED - Checking password...');
+        
+        // Simple admin password check
+        if (password == 'admin123') { 
+          final adminName = getAdminName(email);
+          print('✅ ADMIN LOGIN SUCCESSFUL - Name: $adminName');
+          
+          return {
+            'success': true,
+            'is_admin': true,  // ← This MUST be true for admin
+            'user_name': adminName,
+            'email': email,
+          };
+        } else {
+          print('❌ ADMIN PASSWORD INCORRECT');
+          return {
+            'success': false,
+            'error': 'Invalid admin password. Use "admin123"',
+            'is_admin': false,
+          };
+        }
+      }
+      
+      // Regular users go through backend API
+      print('👤 Regular user - calling API');
+      final response = await _apiService.post(
+        ApiConfig.loginEndpoint,
+        {
           'email': email,
+          'password': password,
+        },
+      );
+
+      print('📡 API Response Status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('✅ Regular user login successful');
+        print('📊 Response data: $data');
+        
+        if (data['access_token'] != null) {
+          _apiService.setToken(data['access_token']);
+        }
+        
+        return {
+          'success': true, 
+          'is_admin': data['is_admin'] ?? false, // Get from backend response
+          'user_name': data['full_name'] ?? 'User',
+          'email': email,
+          'data': data,
         };
       } else {
-        print('❌ ADMIN PASSWORD INCORRECT');
+        final error = json.decode(response.body);
+        print('❌ Regular user login failed: ${error['detail']}');
         return {
-          'success': false,
-          'error': 'Invalid admin password',
+          'success': false, 
+          'error': error['detail'] ?? 'Login failed',
           'is_admin': false,
         };
       }
-    }
-    
-    // Regular users go through backend API
-    print('👤 Regular user - calling API');
-    final response = await _apiService.post(
-      ApiConfig.loginEndpoint,
-      {
-        'email': email,
-        'password': password,
-      },
-    );
-
-    print('📡 API Response Status: ${response.statusCode}');
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      print('✅ Regular user login successful');
-      print('📊 Response data: $data');
-      
-      if (data['access_token'] != null) {
-        _apiService.setToken(data['access_token']);
-      }
-      
-      return {
-        'success': true, 
-        'is_admin': data['is_admin'] ?? false, // Get from backend response
-        'user_name': data['full_name'] ?? 'User',
-        'email': email,
-        'data': data,
-      };
-    } else {
-      final error = json.decode(response.body);
-      print('❌ Regular user login failed: ${error['detail']}');
+    } catch (e) {
+      print('💥 Login error: $e');
       return {
         'success': false, 
-        'error': error['detail'] ?? 'Login failed',
+        'error': 'Network error: Please check your connection',
         'is_admin': false,
       };
     }
-  } catch (e) {
-    print('💥 Login error: $e');
-    return {
-      'success': false, 
-      'error': 'Network error: Please check your connection',
-      'is_admin': false,
-    };
   }
-}
 
   // Register user - REGULAR USERS ONLY
   Future<Map<String, dynamic>> register(

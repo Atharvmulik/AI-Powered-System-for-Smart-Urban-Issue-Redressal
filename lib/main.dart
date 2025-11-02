@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pages/report_page.dart';
-import 'screens/dashboard/correcteddashboard.dart'; // ADD THIS IMPORT
+import 'screens/dashboard/correcteddashboard.dart'; 
+import '../../pages/admin_profile.dart';
 
 void main() {
   runApp(const CivicEyeApp());
@@ -27,7 +28,17 @@ class CivicEyeApp extends StatelessWidget {
       home: const LoginSignupPage(),
       routes: {
         '/login': (context) => const LoginSignupPage(),
-        '/main-navigation': (context) { // ADD THIS ROUTE
+        '/admin_profile': (context) {
+          // Get user data from route arguments
+          final Map<String, String>? userData = 
+              ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
+          
+          return UserProfilePage(
+            userEmail: userData?['email'] ?? 'admin@civiceye.com',
+            userName: userData?['name'] ?? 'Admin User',
+          );
+        },
+        '/main-navigation': (context) {
           final Map<String, String>? userData = 
               ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
           
@@ -93,12 +104,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ];
   }
 
+  void _navigateToProfile() {
+    Navigator.pushNamed(
+      context,
+      '/admin_profile',
+      arguments: {
+        'email': widget.userEmail,
+        'name': widget.userName,
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('CivicEye'),
         actions: [
+          // Add profile button to app bar
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: _navigateToProfile,
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
