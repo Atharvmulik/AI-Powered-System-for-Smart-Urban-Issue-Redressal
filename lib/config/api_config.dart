@@ -147,4 +147,22 @@ class ApiConfig {
   static String buildDepartmentsSummaryUrl({String period = 'month'}) {
     return '$baseUrl/api/departments/summary?period=$period';
   }
+
+
+  static const String userProfileByEmail = '/api/users/profile';
+  static const String updateUserProfile = '/api/users/profile';
+  static const String updateCurrentUserProfile = '/users/me';
+
+  // Helper methods for user profile
+  static String buildUserProfileByEmailUrl(String email) {
+    return '$baseUrl$userProfileByEmail?email=$email';
+  }
+
+  static String buildUpdateUserProfileUrl() {
+    return '$baseUrl$updateUserProfile';
+  }
+
+  static String buildUpdateCurrentUserProfileUrl() {
+    return '$baseUrl$updateCurrentUserProfile';
+  }
 }

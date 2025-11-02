@@ -258,7 +258,44 @@ class ApiService {
   Future<http.Response> getDepartments() async {
     return await get('/api/admin/departments');
   }
+  // Update these methods in your ApiService class
 
+// Get user profile by email (NO AUTH REQUIRED)
+Future<http.Response> getUserProfileByEmail(String email) async {
+  return await getWithParams('/api/users/profile', {
+    'email': email,
+  });
+}
+
+// Update user profile by email (NO AUTH REQUIRED)
+Future<http.Response> updateUserProfile(String email, Map<String, dynamic> profileData) async {
+  return await putWithParams('/api/users/profile', profileData, {
+    'email': email,
+  });
+}
+
+// Add this PUT with parameters method
+Future<http.Response> putWithParams(String endpoint, Map<String, dynamic> data, Map<String, String> params) async {
+  try {
+    final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: params);
+    print('🌐 PUT Request to: $uri');
+    print('📦 Request Data: $data');
+    
+    final response = await http.put(
+      uri,
+      headers: getHeaders(),
+      body: json.encode(data),
+    );
+    
+    print('📡 Response Status: ${response.statusCode}');
+    print('📄 Response Body: ${response.body}');
+    
+    return response;
+  } catch (e) {
+    print('❌ PUT Error: $e');
+    throw Exception('Network error: $e');
+  }
+}
   // ==================== EXISTING ENDPOINTS ====================
 
   Future<http.Response> register(String email, String password, String fullName, String mobileNumber) async {
@@ -393,6 +430,4 @@ Future<http.Response> getUserReports(String userEmail, {String statusFilter = 'a
     return response.statusCode >= 200 && response.statusCode < 300;
   }
 }
-
-
 

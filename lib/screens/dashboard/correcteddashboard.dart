@@ -5,6 +5,7 @@ import '../track/trackissueimage.dart';
 import '../report/issuereport.dart' as report;
 import '../../services/api_service.dart'; 
 import 'dart:convert'; 
+import '../../pages/user_profile.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String userEmail;
@@ -96,113 +97,160 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+Widget build(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const Icon(
-              Icons.radio_button_checked,
-              color: Colors.teal,
-              size: 22,
+  return Scaffold(
+    appBar: AppBar(
+      title: Row(
+        children: [
+          const Icon(
+            Icons.radio_button_checked,
+            color: Colors.teal,
+            size: 22,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'CivicEye',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.teal.shade800,
             ),
-            const SizedBox(width: 8),
-            Text(
-              'CivicEye',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.teal.shade800,
-              ),
-            ),
-          ],
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          onPressed: _showGuideOverlay,
+          icon: const Icon(Icons.help_outline),
         ),
-        actions: [
-          IconButton(
-            onPressed: _showGuideOverlay,
-            icon: const Icon(Icons.help_outline),
-          ),
-          IconButton(
-            onPressed: () {
-              // Notifications logic here if needed
-            },
-            icon: const Icon(Icons.notifications_outlined),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () => _openProfileSheet(context),
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.teal,
-                child: Text(
-                  widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+        IconButton(
+          onPressed: () {
+            // Notifications logic here if needed
+          },
+          icon: const Icon(Icons.notifications_outlined),
+        ),
+        // In your DashboardScreen app bar actions:
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UserProfilePage(
+                    userEmail: widget.userEmail,
                   ),
+                ),
+              );
+            },
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.teal,
+              child: Text(
+                widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _greetingCard(cs),
-                const SizedBox(height: 12),
-                _reportedSection(cs),
-                const SizedBox(height: 18),
-                _reportIssueSection(cs),
-                const SizedBox(height: 18),
-                _resolvedTodaySection(cs),
-                const SizedBox(height: 18),
-                _recentActivityList(),
-              ],
-            ),
+        ),
+      ],
+    ),
+    body: Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _greetingCard(cs),
+              const SizedBox(height: 12),
+              _reportedSection(cs),
+              const SizedBox(height: 18),
+              _reportIssueSection(cs),
+              const SizedBox(height: 18),
+              _resolvedTodaySection(cs),
+              const SizedBox(height: 18),
+              _recentActivityList(),
+            ],
           ),
-          _trackNearbyBar(context),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _bottomIndex,
-        onDestinationSelected: (i) => setState(() => _bottomIndex = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+        ),
+        _trackNearbyBar(context),
+      ],
+    ),
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: _bottomIndex,
+      onDestinationSelected: (index) {
+        // Handle navigation based on selected index
+        switch (index) {
+          case 0: // Home - already on dashboard
+            setState(() => _bottomIndex = index);
+            break;
+          case 1: // Report
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const report.ReportIssuePage(),
+              ),
+            );
+            // Reset to home after navigation
+            Future.delayed(Duration.zero, () {
+              if (mounted) {
+                setState(() => _bottomIndex = 0);
+              }
+            });
+            break;
+          case 2: // Profile
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UserProfilePage(
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            // Reset to home after navigation
+            Future.delayed(Duration.zero, () {
+              if (mounted) {
+                setState(() => _bottomIndex = 0);
+              }
+            });
+            break;
+        }
+      },
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        NavigationDestination(icon: Icon(Icons.add), label: 'Report'),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          label: 'Profile',
+        ),
+      ],
+    ),
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const report.ReportIssuePage(),
           ),
-          NavigationDestination(icon: Icon(Icons.add), label: 'Report'),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const report.ReportIssuePage(),
-            ),
-          );
-        },
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Report issue'),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    );
-  }
+        );
+      },
+      backgroundColor: Colors.green,
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.add),
+      label: const Text('Report issue'),
+    ),
+    floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+  );
+}
 
   Widget _greetingCard(ColorScheme cs) {
     return Container(
@@ -513,54 +561,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  void _openProfileSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: Colors.teal,
-              child: Text(
-                widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              widget.userName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text('Email: ${widget.userEmail}'),
-            const SizedBox(height: 6),
-            const Text('Ward 12, Volunteer'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Add logout functionality here
-              },
-              child: const Text('Logout'),
-            ),
-          ],
-        ),
       ),
     );
   }
