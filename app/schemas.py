@@ -372,3 +372,98 @@ class DepartmentEfficiencyResponse(BaseModel):
     efficiency_trend: List[float]
     months: List[str]
     current_efficiency: float
+
+
+# Add these to your existing schemas.py
+
+class UserProfileResponse(BaseModel):
+    id: int
+    email: EmailStr
+    full_name: str
+    mobile_number: str
+    is_admin: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    mobile_number: Optional[str] = None
+
+    @validator('full_name')
+    def validate_full_name(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError('Full name cannot be empty')
+            if len(v) < 2:
+                raise ValueError('Full name must be at least 2 characters long')
+            if not re.match(r'^[a-zA-Z\s_]+$', v):
+                raise ValueError('Full name can only contain letters, spaces and underscores')
+        return v.strip() if v else v
+
+    @validator('mobile_number')
+    def validate_mobile_number(cls, v):
+        if v is not None:
+            if not re.match(r'^\d{10}$', v):
+                raise ValueError('Mobile number must be exactly 10 digits')
+        return v
+    
+
+# ========== MAP SCHEMAS ==========
+
+class MapIssueResponse(BaseModel):
+    id: int
+    title: str
+    category: str
+    status: str
+    urgency_level: str
+    location_lat: float
+    location_long: float
+    description: Optional[str] = None
+    created_at: datetime
+    user_email: Optional[str] = None
+    location_address: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class MapIssuesResponse(BaseModel):
+    issues: List[MapIssueResponse]
+
+class MapBoundsRequest(BaseModel):
+    north: float
+    south: float
+    east: float
+    west: float
+
+    @validator('north')
+    def validate_north(cls, v):
+        if not -90 <= v <= 90:
+            raise ValueError('North bound must be between -90 and 90')
+        return v
+
+    @validator('south')
+    def validate_south(cls, v):
+        if not -90 <= v <= 90:
+            raise ValueError('South bound must be between -90 and 90')
+        return v
+
+    @validator('east')
+    def validate_east(cls, v):
+        if not -180 <= v <= 180:
+            raise ValueError('East bound must be between -180 and 180')
+        return v
+
+    @validator('west')
+    def validate_west(cls, v):
+        if not -180 <= v <= 180:
+            raise ValueError('West bound must be between -180 and 180')
+        return v
+
+class MapStatsResponse(BaseModel):
+    total_issues: int
+    pending_issues: int
+    in_progress_issues: int
+    resolved_issues: int
+    categories: List[str]

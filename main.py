@@ -22,7 +22,7 @@ from sqlalchemy.future import select
 from app import models
 from app.database import get_db, engine, AsyncSessionLocal
 from app.models import Report, User, Category, Status
-from app.schemas import UserCreate, UserResponse, UserLogin  
+from app.schemas import UserCreate, UserResponse, UserLogin,MapStatsResponse,MapIssuesResponse,MapIssueResponse  
 from app.auth_utils import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM    
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -1689,16 +1689,13 @@ async def get_department_efficiency_trend(
         )
 
 
-
-
-
 @app.get("/debug/check-user-reports")
 async def debug_check_user_reports(
     user_email: str = Query(..., description="User email to check"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Debug endpoint to check exact user reports
+    Debug endpoint to check exact user reports (FIXED isoformat error)
     """
     try:
         print(f"🔍 DEBUG: Checking exact matches for email: {user_email}")
@@ -1719,12 +1716,15 @@ async def debug_check_user_reports(
         
         report_details = []
         for report in exact_reports:
+            # FIXED: Handle None created_at safely
+            created_at_str = report.created_at.isoformat() if report.created_at else None
+            
             report_details.append({
                 "id": report.id,
                 "title": report.title,
                 "user_email": report.user_email,
                 "user_name": report.user_name,
-                "created_at": report.created_at.isoformat(),
+                "created_at": created_at_str,  # FIXED: This was causing the error
                 "category_id": report.category_id,
                 "status_id": report.status_id
             })
@@ -1745,3 +1745,340 @@ async def debug_check_user_reports(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Debug error: {str(e)}"
         )
+    
+
+
+
+# User Profile Schemas (add before the endpoints)
+class UserProfileResponse(BaseModel):
+    id: int
+    email: EmailStr
+    full_name: str
+    mobile_number: str
+    is_admin: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    mobile_number: Optional[str] = None
+
+    @validator('full_name')
+    def validate_full_name(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError('Full name cannot be empty')
+            if len(v) < 2:
+                raise ValueError('Full name must be at least 2 characters long')
+            if not re.match(r'^[a-zA-Z\s_]+$', v):
+                raise ValueError('Full name can only contain letters, spaces and underscores')
+        return v.strip() if v else v
+
+    @validator('mobile_number')
+    def validate_mobile_number(cls, v):
+        if v is not None:
+            if not re.match(r'^\d{10}$', v):
+                raise ValueError('Mobile number must be exactly 10 digits')
+        return v
+
+# User Profile Endpoints (NO AUTHENTICATION REQUIRED)
+
+@app.get("/api/users/profile", response_model=UserProfileResponse)
+async def get_user_profile_by_email(
+    email: str = Query(..., description="User email address"),
+    db: AsyncSession = Depends(get_db)
+    # REMOVED: current_user: User = Depends(get_current_user)
+):
+    """
+    Get user profile by email (Public - no auth required)
+    """
+    try:
+        # Find user by email
+        result = await db.execute(select(User).filter(User.email == email))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # REMOVED: Authorization check - anyone can view any profile
+        
+        return UserProfileResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            mobile_number=user.mobile_number,
+            is_admin=user.is_admin,
+            created_at=user.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching user profile: {str(e)}"
+        )
+
+@app.put("/api/users/profile", response_model=UserProfileResponse)
+async def update_user_profile(
+    profile_data: UserProfileUpdate,
+    email: str = Query(..., description="User email to update"),
+    db: AsyncSession = Depends(get_db)
+    # REMOVED: current_user: User = Depends(get_current_user)
+):
+    """
+    Update user profile by email (Public - no auth required)
+    """
+    try:
+        # Find user by email
+        result = await db.execute(select(User).filter(User.email == email))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Update fields if provided
+        update_data = profile_data.dict(exclude_unset=True)
+        
+        for field, value in update_data.items():
+            setattr(user, field, value)
+        
+        # Save changes
+        await db.commit()
+        await db.refresh(user)
+        
+        return UserProfileResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            mobile_number=user.mobile_number,
+            is_admin=user.is_admin,
+            created_at=user.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating user profile: {str(e)}"
+        )
+
+# Alternative endpoint without email parameter (uses user ID from path)
+@app.put("/api/users/profile/{user_id}", response_model=UserProfileResponse)
+async def update_user_profile_by_id(
+    user_id: int,
+    profile_data: UserProfileUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update user profile by user ID (Public - no auth required)
+    """
+    try:
+        # Find user by ID
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Update fields if provided
+        update_data = profile_data.dict(exclude_unset=True)
+        
+        for field, value in update_data.items():
+            setattr(user, field, value)
+        
+        # Save changes
+        await db.commit()
+        await db.refresh(user)
+        
+        return UserProfileResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            mobile_number=user.mobile_number,
+            is_admin=user.is_admin,
+            created_at=user.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating user profile: {str(e)}"
+        )
+    
+
+    
+# Add these endpoints to your main.py
+
+@app.get("/api/admin/map/issues", response_model=MapIssuesResponse)
+async def get_map_issues(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all issues with coordinates for map display
+    """
+    try:
+        # Build query using select
+        stmt = select(Report).where(
+            Report.location_lat.isnot(None), 
+            Report.location_long.isnot(None)
+        )
+        
+        if status and status != "all":
+            stmt = stmt.where(Report.status == status)
+        
+        if category and category != "all":
+            stmt = stmt.where(Report.category == category)
+        
+        # Execute query
+        result = await db.execute(stmt)
+        reports = result.scalars().all()
+        
+        # Format response
+        map_issues = []
+        for report in reports:
+            map_issues.append(MapIssueResponse(
+                id=report.id,
+                title=report.title,
+                category=report.category,
+                status=report.status,
+                urgency_level=report.urgency_level,
+                location_lat=report.location_lat,
+                location_long=report.location_long,
+                description=report.description,
+                created_at=report.created_at,
+                user_email=report.user_email,
+                location_address=report.location_address
+            ))
+        
+        return MapIssuesResponse(issues=map_issues)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching map issues: {str(e)}")
+
+@app.get("/api/admin/map/issues-in-bounds", response_model=MapIssuesResponse)
+async def get_issues_in_bounds(
+    north: float,
+    south: float,
+    east: float,
+    west: float,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get issues within specific geographic bounds
+    """
+    try:
+        # Validate bounds
+        if north <= south:
+            raise HTTPException(status_code=400, detail="North must be greater than south")
+        if east <= west:
+            raise HTTPException(status_code=400, detail="East must be greater than west")
+        
+        # Build async query
+        stmt = select(Report).where(
+            Report.location_lat.isnot(None),
+            Report.location_long.isnot(None),
+            Report.location_lat.between(south, north),
+            Report.location_long.between(west, east)
+        )
+        
+        result = await db.execute(stmt)
+        reports = result.scalars().all()
+        
+        map_issues = []
+        for report in reports:
+            map_issues.append(MapIssueResponse(
+                id=report.id,
+                title=report.title,
+                category=report.category,
+                status=report.status,
+                urgency_level=report.urgency_level,
+                location_lat=report.location_lat,
+                location_long=report.location_long,
+                description=report.description,
+                created_at=report.created_at,
+                user_email=report.user_email,
+                location_address=report.location_address
+            ))
+        
+        return MapIssuesResponse(issues=map_issues)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching bounded issues: {str(e)}")
+
+@app.get("/api/admin/map/stats", response_model=MapStatsResponse)
+async def get_map_stats(db: AsyncSession = Depends(get_db)):
+    """
+    Get statistics for map view
+    """
+    try:
+        # Count issues with coordinates using async
+        stmt_total = select(Report).where(
+            Report.location_lat.isnot(None),
+            Report.location_long.isnot(None)
+        )
+        result_total = await db.execute(stmt_total)
+        total_issues = len(result_total.scalars().all())
+        
+        # Count by status
+        stmt_pending = select(Report).where(
+            Report.status == "Pending",
+            Report.location_lat.isnot(None),
+            Report.location_long.isnot(None)
+        )
+        result_pending = await db.execute(stmt_pending)
+        pending_issues = len(result_pending.scalars().all())
+        
+        stmt_in_progress = select(Report).where(
+            Report.status == "In Progress",
+            Report.location_lat.isnot(None),
+            Report.location_long.isnot(None)
+        )
+        result_in_progress = await db.execute(stmt_in_progress)
+        in_progress_issues = len(result_in_progress.scalars().all())
+        
+        stmt_resolved = select(Report).where(
+            Report.status == "Resolved",
+            Report.location_lat.isnot(None),
+            Report.location_long.isnot(None)
+        )
+        result_resolved = await db.execute(stmt_resolved)
+        resolved_issues = len(result_resolved.scalars().all())
+        
+        # Get unique categories
+        stmt_categories = select(Report.category).where(
+            Report.location_lat.isnot(None)
+        ).distinct()
+        result_categories = await db.execute(stmt_categories)
+        categories_result = result_categories.scalars().all()
+        
+        categories = [cat for cat in categories_result if cat]
+        
+        return MapStatsResponse(
+            total_issues=total_issues,
+            pending_issues=pending_issues,
+            in_progress_issues=in_progress_issues,
+            resolved_issues=resolved_issues,
+            categories=categories
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching map stats: {str(e)}")
