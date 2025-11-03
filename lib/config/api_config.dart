@@ -1,6 +1,13 @@
 class ApiConfig {
   static const String baseUrl = 'http://10.0.2.2:8000';
   
+  // ==================== MAP ENDPOINTS ====================
+  
+  // Map endpoints
+  static String get mapIssues => "/api/admin/map/issues";
+  static String get mapIssuesInBounds => "/api/admin/map/issues-in-bounds";
+  static String get mapStats => "/api/admin/map/stats";
+  
   // ✅ CORRECTED: Exact endpoints from your FastAPI backend
   static const String loginEndpoint = '/login';
   static const String registerEndpoint = '/signup'; 
@@ -66,6 +73,33 @@ class ApiConfig {
   static String buildUrl(String endpoint) {
     return baseUrl + endpoint;
   }
+  
+  // ==================== MAP HELPER METHODS ====================
+  
+  // Map helper methods
+  static String buildMapIssuesUrl({String? status, String? category}) {
+    String url = '$baseUrl$mapIssues';
+    final params = <String>[];
+    
+    if (status != null && status != 'all') params.add('status=$status');
+    if (category != null && category != 'all') params.add('category=$category');
+    
+    if (params.isNotEmpty) {
+      url += '?${params.join('&')}';
+    }
+    
+    return url;
+  }
+  
+  static String buildMapIssuesInBoundsUrl(double north, double south, double east, double west) {
+    return '$baseUrl$mapIssuesInBounds?north=$north&south=$south&east=$east&west=$west';
+  }
+  
+  static String buildMapStatsUrl() {
+    return '$baseUrl$mapStats';
+  }
+  
+  // ==================== EXISTING HELPER METHODS ====================
   
   // ✅ Helper methods for parameterized endpoints
   static String buildReportTimelineUrl(int reportId) {
@@ -147,7 +181,6 @@ class ApiConfig {
   static String buildDepartmentsSummaryUrl({String period = 'month'}) {
     return '$baseUrl/api/departments/summary?period=$period';
   }
-
 
   static const String userProfileByEmail = '/api/users/profile';
   static const String updateUserProfile = '/api/users/profile';

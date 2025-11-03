@@ -4,6 +4,7 @@ import '../../pages/report_page.dart';
 import '../../pages/view_issue_admin.dart';
 import '../../pages/dept_analysis.dart';
 import '../../pages/admin_profile.dart';
+import '../../pages/map_view.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   final String userEmail;
@@ -41,17 +42,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   void _onNavTapped(int index) {
-  if (index == 4) { 
+  if (index == 4) { // Profile
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => UserProfilePage(
-          userEmail: widget.userEmail, // Use widget.userEmail
-          userName: widget.userName,   // Use widget.userName
+          userEmail: widget.userEmail,
+          userName: widget.userName,
         ),
       ),
     );
   }  
+  else if (index == 3) { // Map View index
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AdminMapViewPage()),
+    );
+  }
   else if (index == 2) { // Issue Reports index
     Navigator.push(
       context,
