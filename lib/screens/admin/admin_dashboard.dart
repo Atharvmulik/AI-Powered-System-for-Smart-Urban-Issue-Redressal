@@ -83,7 +83,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Icon(Icons.admin_panel_settings_rounded, color: Colors.white),
             SizedBox(width: 8),
             Text(
-              "CivicEye Admin",
+              "UrbanSim AI Admin",
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ],

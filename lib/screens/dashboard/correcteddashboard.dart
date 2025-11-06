@@ -2,10 +2,10 @@ import 'dart:math' as math;
 import 'dart:convert'; 
 import 'package:flutter/material.dart';
 import '../guide/guide.dart';
-import '../track/trackissueimage.dart';
 import '../report/issuereport.dart' as report;
 import '../../services/api_service.dart'; 
 import '../../pages/user_profile.dart';
+import '../../pages/user_report_page.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String userEmail;
@@ -57,33 +57,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _loadIssues() async {
   try {
-    final ApiService apiService = ApiService(); // Create instance
-    final response = await apiService.getUserReportsForDashboard(widget.userEmail);
+    print('🔄 Loading issues for user: ${widget.userEmail}');
+    final ApiService apiService = ApiService();
+    final response = await apiService.getUserReports(widget.userEmail, statusFilter: 'all');
+    
+    print('📡 Response status: ${response.statusCode}');
+    print('📦 Full response: ${response.body}'); // Add this to see the actual data
     
     if (mounted) {
       setState(() {
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           reportedIssues = data['complaints'] ?? [];
+          print('✅ Successfully loaded ${reportedIssues.length} issues');
+          
+          // Debug: Print each issue to see the actual data structure
+          for (var i = 0; i < reportedIssues.length; i++) {
+            print('📝 Issue $i: ${reportedIssues[i]}');
+          }
         } else {
-          // Handle error case
           reportedIssues = [];
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load issues: ${response.statusCode}')),
-          );
+          print('❌ Failed to load issues: ${response.statusCode}');
         }
         isLoading = false;
       });
     }
   } catch (e) {
+    print('❌ Error loading issues: $e');
     if (mounted) {
       setState(() {
         isLoading = false;
         reportedIssues = [];
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load issues: $e')),
-      );
     }
   }
 }
@@ -113,7 +118,7 @@ Widget build(BuildContext context) {
           ),
           const SizedBox(width: 8),
           Text(
-            'CivicEye',
+            'UrbanSim AI',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white, // Changed text color to white for contrast
@@ -136,12 +141,14 @@ Widget build(BuildContext context) {
         Padding(
           padding: const EdgeInsets.only(right: 12),
           child: GestureDetector(
+            // In _reportedSection method, update the onTap:
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => UserProfilePage(
+                  builder: (_) => UserReportsPage(
                     userEmail: widget.userEmail,
+                    userName: widget.userName,
                   ),
                 ),
               );
@@ -280,14 +287,18 @@ Widget build(BuildContext context) {
                 Wrap(
                   spacing: 8,
                   children: [
-                    _quickChip('Track', Icons.location_on, () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TrackIssuesPage(userEmail: widget.userEmail),
+                    // In _greetingCard method, update the Track chip:
+                  _quickChip('Track', Icons.location_on, () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UserReportsPage(
+                          userEmail: widget.userEmail,
+                          userName: widget.userName,
                         ),
-                      );
-                    }),
+                      ),
+                    );
+                  }),
                     _quickChip('Nearby Issues', Icons.receipt_long, () {
                       Navigator.push(
                         context,
@@ -309,69 +320,64 @@ Widget build(BuildContext context) {
   }
 
   Widget _reportedSection(ColorScheme cs) {
-    if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Reported issues',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadIssues,
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 180,
-          child: reportedIssues.isEmpty
-              ? const Center(child: Text('No issues reported yet'))
-              : ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: reportedIssues.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final issue = reportedIssues[index];
-                    return _IssueCard(
-                      data: IssueCardData(
-                        title: issue['title'] ?? 'No title',
-                        type: issue['category'] ?? 'General',
-                        urgency: _getUrgencyValue(issue['urgency'] ?? 'medium'),
-                        distanceKm: 0.5,
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TrackIssuePage(
-                              issue: IssueCardData(
-                                title: issue['title'] ?? 'No title',
-                                type: issue['category'] ?? 'General',
-                                urgency: _getUrgencyValue(issue['urgency'] ?? 'medium'),
-                                distanceKm: 0.5,
-                              ),
-                              userEmail: widget.userEmail, // Pass user data
-                              userName: widget.userName,   // Pass user data
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
+  if (isLoading) {
+    return const Center(child: CircularProgressIndicator());
   }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Reported issues',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadIssues,
+          ),
+        ],
+      ),
+      const SizedBox(height: 10),
+      SizedBox(
+        height: 180,
+        child: reportedIssues.isEmpty
+            ? const Center(child: Text('No issues reported yet'))
+            : ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: reportedIssues.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final issue = reportedIssues[index];
+                  return _IssueCard(
+                    data: IssueCardData(
+                      title: issue['title'] ?? 'No title',
+                      type: issue['category'] ?? 'General',
+                      urgency: _getUrgencyValue(issue['urgency_level'] ?? 'medium'), // Fixed field name
+                      distanceKm: 0.5,
+                    ),
+                    onTap: () {
+                      // ✅ CORRECTED: Navigate to UserReportsPage instead of TrackIssuePage
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => UserReportsPage(
+                            userEmail: widget.userEmail,
+                            userName: widget.userName,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+      ),
+    ],
+  );
+}
 
   Widget _reportIssueSection(ColorScheme cs) {
     return Column(

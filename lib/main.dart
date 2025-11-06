@@ -14,7 +14,7 @@ class CivicEyeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'CivicEye - Urban Issue Redressal',
+      title: 'UrbanSim AI - Urban Issue Redressal',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -119,7 +119,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CivicEye'),
+        title: const Text('UrbanSim AI'),
         actions: [
           // Add profile button to app bar
           IconButton(
