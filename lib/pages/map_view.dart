@@ -18,7 +18,7 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
 
   final String apiKey = "e60aa95d14bf10cc8a3d5cfff82bb352";
 
-  LatLng currentCenter = LatLng(18.5204, 73.8567); // Default: Pune
+  LatLng currentCenter = LatLng(18.5204, 73.8567); 
   double currentZoom = 10.0;
   List<Marker> issueMarkers = [];
 

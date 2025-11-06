@@ -1,10 +1,10 @@
 import 'dart:math' as math;
+import 'dart:convert'; 
 import 'package:flutter/material.dart';
 import '../guide/guide.dart';
 import '../track/trackissueimage.dart';
 import '../report/issuereport.dart' as report;
 import '../../services/api_service.dart'; 
-import 'dart:convert'; 
 import '../../pages/user_profile.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -101,12 +101,14 @@ Widget build(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
 
   return Scaffold(
+    backgroundColor: Colors.white, // Changed background to white
     appBar: AppBar(
+      backgroundColor: Colors.teal[800], // Changed to dark teal
       title: Row(
         children: [
           const Icon(
             Icons.radio_button_checked,
-            color: Colors.teal,
+            color: Colors.white, // Changed icon color to white for contrast
             size: 22,
           ),
           const SizedBox(width: 8),
@@ -114,7 +116,7 @@ Widget build(BuildContext context) {
             'CivicEye',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.teal.shade800,
+              color: Colors.white, // Changed text color to white for contrast
             ),
           ),
         ],
@@ -122,13 +124,13 @@ Widget build(BuildContext context) {
       actions: [
         IconButton(
           onPressed: _showGuideOverlay,
-          icon: const Icon(Icons.help_outline),
+          icon: const Icon(Icons.help_outline, color: Colors.white), // White icon
         ),
         IconButton(
           onPressed: () {
             // Notifications logic here if needed
           },
-          icon: const Icon(Icons.notifications_outlined),
+          icon: const Icon(Icons.notifications_outlined, color: Colors.white), // White icon
         ),
         // In your DashboardScreen app bar actions:
         Padding(
@@ -146,11 +148,11 @@ Widget build(BuildContext context) {
             },
             child: CircleAvatar(
               radius: 18,
-              backgroundColor: Colors.teal,
+              backgroundColor: Colors.white, // Changed to white for contrast
               child: Text(
                 widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Colors.teal[800], // Changed text color to teal
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -159,27 +161,22 @@ Widget build(BuildContext context) {
         ),
       ],
     ),
-    body: Stack(
-      children: [
-        SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _greetingCard(cs),
-              const SizedBox(height: 12),
-              _reportedSection(cs),
-              const SizedBox(height: 18),
-              _reportIssueSection(cs),
-              const SizedBox(height: 18),
-              _resolvedTodaySection(cs),
-              const SizedBox(height: 18),
-              _recentActivityList(),
-            ],
-          ),
-        ),
-        _trackNearbyBar(context),
-      ],
+    body: SingleChildScrollView( // Removed the Stack and _trackNearbyBar
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _greetingCard(cs),
+          const SizedBox(height: 12),
+          _reportedSection(cs),
+          const SizedBox(height: 18),
+          _reportIssueSection(cs),
+          const SizedBox(height: 18),
+          _resolvedTodaySection(cs),
+          const SizedBox(height: 18),
+          _recentActivityList(),
+        ],
+      ),
     ),
     bottomNavigationBar: NavigationBar(
       selectedIndex: _bottomIndex,
@@ -494,40 +491,6 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _trackNearbyBar(BuildContext context) {
-    return Positioned(
-      left: 16,
-      right: 16,
-      bottom: 78,
-      child: GestureDetector(
-        onTap: () => _showSnack('Showing nearby issues…'),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.my_location, color: Colors.white),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Track nearby issues',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Icon(Icons.chevron_right, color: Colors.white),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _quickChip(String label, IconData icon, VoidCallback onTap) {
     return ActionChip(
       avatar: Icon(icon, size: 18, color: Colors.teal.shade800),
@@ -563,10 +526,6 @@ Widget build(BuildContext context) {
         ],
       ),
     );
-  }
-
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }
 
