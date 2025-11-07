@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:convert';
+import '../../services/api_service.dart';
 import '../../pages/report_page.dart';
 import '../../pages/view_issue_admin.dart';
 import '../../pages/dept_analysis.dart';
@@ -23,9 +25,12 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _selectedIndex = 0;
 
-  int totalIssues = 1234;
-  int resolvedIssues = 890;
-  int pendingIssues = 250;
+  // Real-time data variables
+  int totalIssues = 0;
+  int resolvedIssues = 0;
+  int pendingIssues = 0;
+  bool isLoading = true;
+  final ApiService apiService = ApiService();
 
   final List<Widget> _pages = [];
 
@@ -39,40 +44,74 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _buildPlaceholderPage("Map View"),
       _buildPlaceholderPage("Profile Page"),
     ]);
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+
+      // Fetch admin dashboard stats from backend
+      final response = await apiService.getAdminDashboardStats();
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        setState(() {
+          totalIssues = data['total_issues'] ?? 0;
+          resolvedIssues = data['resolved_issues'] ?? 0;
+          pendingIssues = data['pending_issues'] ?? 0;
+          isLoading = false;
+        });
+      } else {
+        // Fallback to current values if API fails
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading dashboard data: $e');
+      // Keep current values on error
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   void _onNavTapped(int index) {
-  if (index == 4) { // Profile
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => UserProfilePage(
-          userEmail: widget.userEmail,
-          userName: widget.userName,
+    if (index == 4) { // Profile
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfilePage(
+            userEmail: widget.userEmail,
+            userName: widget.userName,
+          ),
         ),
-      ),
-    );
-  }  
-  else if (index == 3) { // Map View index
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AdminMapViewPage()),
-    );
+      );
+    }  
+    else if (index == 3) { // Map View index
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AdminMapViewPage()),
+      );
+    }
+    else if (index == 2) { // Issue Reports index
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const IssueTrackingPage()),
+      );
+    } else if (index == 1) { // Department Analysis index
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const DepartmentAnalysisPage()),
+      );
+    } else {
+      setState(() => _selectedIndex = index);
+    }
   }
-  else if (index == 2) { // Issue Reports index
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const IssueTrackingPage()),
-    );
-  } else if (index == 1) { // Department Analysis index
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const DepartmentAnalysisPage()),
-    );
-  } else {
-    setState(() => _selectedIndex = index);
-  }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +122,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Icon(Icons.admin_panel_settings_rounded, color: Colors.white),
             SizedBox(width: 8),
             Text(
-              "UrbanSim AI Admin",
+              "UrbanSim AI",
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ],
@@ -91,6 +130,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         backgroundColor: Colors.deepPurple,
         elevation: 3,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _loadDashboardData,
+            tooltip: 'Refresh Data',
+          ),
           IconButton(
             onPressed: () {
               // Use direct navigation for logout
@@ -131,43 +175,232 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildDashboard() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.deepPurple.shade50,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(children: [
-            const CircleAvatar(
-              radius: 32,
-              backgroundColor: Colors.white,
-              child: Icon(Icons.admin_panel_settings_rounded,
-                  color: Colors.deepPurple, size: 36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, 
+        children: [
+          // Welcome Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.deepPurple.shade50,
+              borderRadius: BorderRadius.circular(20),
             ),
-            const SizedBox(width: 16),
-            Expanded(  // Remove 'const'
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Hello, ${widget.userName.split(' ').last} 👋",  // ✅ Dynamic value
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.deepPurple)),
-                  const SizedBox(height: 6),
-                  const Text("Monitor and manage city issues efficiently",
-                      style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 15,
-                          fontStyle: FontStyle.italic)),
-                ],
+            child: Row(children: [
+              const CircleAvatar(
+                radius: 32,
+                backgroundColor: Colors.white,
+                child: Icon(Icons.admin_panel_settings_rounded,
+                    color: Colors.deepPurple, size: 36),
               ),
-            )
-          ]),
-        ),
-        const SizedBox(height: 40),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Hello, ${widget.userName.split(' ').last} 👋",
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple
+                      )
+                    ),
+                    const SizedBox(height: 6),
+                    const Text("Monitor and manage city issues efficiently",
+                        style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 15,
+                            fontStyle: FontStyle.italic)),
+                  ],
+                ),
+              )
+            ]),
+          ),
+          const SizedBox(height: 40),
 
+          // Stats Cards - Show loading or real data
+          if (isLoading)
+            _buildLoadingStats()
+          else
+            _buildStatsCards(),
+
+          const SizedBox(height: 20),
+
+          _buildSectionTitle("Monthly Trends"),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: _whiteCardDecoration(),
+            child: SizedBox(
+              height: 220,
+              child: LineChart(LineChartData(
+                gridData: FlGridData(show: true, drawVerticalLine: false),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (value, meta) {
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+                        if (value.toInt() >= 0 && value.toInt() < months.length) {
+                          return Text(months[value.toInt()]);
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 28,
+                        getTitlesWidget: (value, meta) {
+                          return Text(value.toInt().toString());
+                        }),
+                  ),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    isCurved: true,
+                    color: Colors.deepPurple,
+                    barWidth: 3,
+                    belowBarData: BarAreaData(
+                        show: true,
+                        color: Colors.deepPurple.withOpacity(0.1)),
+                    spots: const [
+                      FlSpot(0, 3),
+                      FlSpot(1, 2),
+                      FlSpot(2, 4),
+                      FlSpot(3, 3.5),
+                      FlSpot(4, 4.8),
+                      FlSpot(5, 4.2),
+                      FlSpot(6, 4.6),
+                    ],
+                  )
+                ],
+              )),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          _buildSectionTitle("Department Performance"),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: _whiteCardDecoration(),
+            child: Column(
+              children: [
+                _buildDeptPerformanceBar("Public Works", 0.85, Colors.orange),
+                _buildDeptPerformanceBar("Sanitation", 0.70, Colors.green),
+                _buildDeptPerformanceBar("Traffic", 0.50, Colors.blue),
+                _buildDeptPerformanceBar("Parks", 0.60, Colors.purple),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          _buildSectionTitle("Issue Breakdown"),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: _whiteCardDecoration(),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 180,
+                  child: PieChart(PieChartData(
+                    centerSpaceRadius: 40,
+                    sectionsSpace: 2,
+                    sections: [
+                      _buildPieSection(Colors.teal, 35, "35%"),
+                      _buildPieSection(Colors.deepPurple, 25, "25%"),
+                      _buildPieSection(Colors.orange, 20, "20%"),
+                      _buildPieSection(Colors.blue, 20, "20%"),
+                    ],
+                  )),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 12,
+                  children: const [
+                    _Legend(color: Colors.teal, text: "Potholes"),
+                    _Legend(color: Colors.deepPurple, text: "Streetlights"),
+                    _Legend(color: Colors.orange, text: "Waste"),
+                    _Legend(color: Colors.blue, text: "Other"),
+                  ],
+                )
+              ],
+            ),
+          ),
+          const SizedBox(height: 25),
+
+          // 🆕 Recent Reports Section
+          _buildSectionTitle("Recent Reports"),
+          const SizedBox(height: 10),
+          _buildRecentReport("Large pothole on Main St", "Oakland, CA • 2 hours ago",
+              "Pending", Colors.orange, Icons.construction_outlined),
+          _buildRecentReport("Broken streetlight at 5th & Elm",
+              "Springfield, IL • 8 hours ago", "In Progress", Colors.blueAccent,
+              Icons.lightbulb_outline),
+          _buildRecentReport("Overflowing trash can in City Park",
+              "Columbus, OH • 1 day ago", "Resolved", Colors.green,
+              Icons.delete_outline),
+          _buildRecentReport("Fallen tree blocking side road",
+              "Portland, OR • 1 day ago", "Urgent", Colors.redAccent,
+              Icons.warning_amber_rounded),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  // Loading state for stats
+  Widget _buildLoadingStats() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            _buildLoadingCard(),
+            _buildLoadingCard(),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(width: 180, child: _buildLoadingCard()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingCard() {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(16),
+        decoration: _whiteCardDecoration(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(height: 8),
+            const Text("Loading...", 
+                style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Stats Cards with Real Data
+  Widget _buildStatsCards() {
+    return Column(
+      children: [
         Row(
           children: [
             _buildAnimatedCard("Total Issues", totalIssues, "+15% vs last month",
@@ -192,133 +425,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
           ],
         ),
-
-        const SizedBox(height: 20),
-
-        _buildSectionTitle("Monthly Trends"),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _whiteCardDecoration(),
-          child: SizedBox(
-            height: 220,
-            child: LineChart(LineChartData(
-              gridData: FlGridData(show: true, drawVerticalLine: false),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 30,
-                    getTitlesWidget: (value, meta) {
-                      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-                      if (value.toInt() >= 0 && value.toInt() < months.length) {
-                        return Text(months[value.toInt()]);
-                      }
-                      return const Text('');
-                    },
-                  ),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 28,
-                      getTitlesWidget: (value, meta) {
-                        return Text(value.toInt().toString());
-                      }),
-                ),
-              ),
-              lineBarsData: [
-                LineChartBarData(
-                  isCurved: true,
-                  color: Colors.deepPurple,
-                  barWidth: 3,
-                  belowBarData: BarAreaData(
-                      show: true,
-                      color: Colors.deepPurple.withOpacity(0.1)),
-                  spots: const [
-                    FlSpot(0, 3),
-                    FlSpot(1, 2),
-                    FlSpot(2, 4),
-                    FlSpot(3, 3.5),
-                    FlSpot(4, 4.8),
-                    FlSpot(5, 4.2),
-                    FlSpot(6, 4.6),
-                  ],
-                )
-              ],
-            )),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        _buildSectionTitle("Department Performance"),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _whiteCardDecoration(),
-          child: Column(
-            children: [
-              _buildDeptPerformanceBar("Public Works", 0.85, Colors.orange),
-              _buildDeptPerformanceBar("Sanitation", 0.70, Colors.green),
-              _buildDeptPerformanceBar("Traffic", 0.50, Colors.blue),
-              _buildDeptPerformanceBar("Parks", 0.60, Colors.purple),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        _buildSectionTitle("Issue Breakdown"),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _whiteCardDecoration(),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 180,
-                child: PieChart(PieChartData(
-                  centerSpaceRadius: 40,
-                  sectionsSpace: 2,
-                  sections: [
-                    _buildPieSection(Colors.teal, 35, "35%"),
-                    _buildPieSection(Colors.deepPurple, 25, "25%"),
-                    _buildPieSection(Colors.orange, 20, "20%"),
-                    _buildPieSection(Colors.blue, 20, "20%"),
-                  ],
-                )),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 12,
-                children: const [
-                  _Legend(color: Colors.teal, text: "Potholes"),
-                  _Legend(color: Colors.deepPurple, text: "Streetlights"),
-                  _Legend(color: Colors.orange, text: "Waste"),
-                  _Legend(color: Colors.blue, text: "Other"),
-                ],
-              )
-            ],
-          ),
-        ),
-        const SizedBox(height: 25),
-
-        // 🆕 Recent Reports Section
-        _buildSectionTitle("Recent Reports"),
-        const SizedBox(height: 10),
-        _buildRecentReport("Large pothole on Main St", "Oakland, CA • 2 hours ago",
-            "Pending", Colors.orange, Icons.construction_outlined),
-        _buildRecentReport("Broken streetlight at 5th & Elm",
-            "Springfield, IL • 8 hours ago", "In Progress", Colors.blueAccent,
-            Icons.lightbulb_outline),
-        _buildRecentReport("Overflowing trash can in City Park",
-            "Columbus, OH • 1 day ago", "Resolved", Colors.green,
-            Icons.delete_outline),
-        _buildRecentReport("Fallen tree blocking side road",
-            "Portland, OR • 1 day ago", "Urgent", Colors.redAccent,
-            Icons.warning_amber_rounded),
-        const SizedBox(height: 20),
-      ]),
+      ],
     );
   }
 

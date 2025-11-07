@@ -215,7 +215,7 @@ class _LoginSignupPageState extends State<LoginSignupPage>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "CIVIC EYE",
+                    "UrbanSim AI",
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,

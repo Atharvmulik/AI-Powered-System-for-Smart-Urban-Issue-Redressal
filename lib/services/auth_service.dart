@@ -7,11 +7,11 @@ class AuthService {
   
   // Define admin emails - ONLY these can access admin dashboard
   static const List<Map<String, String>> adminUsers = [
-    {'email': 'admin1@civiceye.com', 'name': 'Admin Rohan Sharma'},
-    {'email': 'admin2@civiceye.com', 'name': 'Admin Priya Patel'},
-    {'email': 'admin3@civiceye.com', 'name': 'Admin Amit Kumar'},
-    {'email': 'admin4@civiceye.com', 'name': 'Admin Neha Singh'},
-    {'email': 'vaishnavi@civiceye.com', 'name': 'Admin Vaishnavi Nie'},
+    {'email': 'atharv@civiceye.com', 'name': 'Admin Atharv'},
+    {'email': 'siddhi@civiceye.com', 'name': 'Admin Sidhhi'},
+    {'email': 'tejas@civiceye.com', 'name': 'Admin Tejas'},
+    {'email': 'roshani@civiceye.com', 'name': 'Admin Roshani'},
+    {'email': 'vaishnavi@civiceye.com', 'name': 'Admin Vaishnavi '},
   ];
 
   // Check if email is admin - CORRECTED

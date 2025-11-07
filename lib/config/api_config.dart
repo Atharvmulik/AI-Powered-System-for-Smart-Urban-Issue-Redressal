@@ -198,4 +198,24 @@ class ApiConfig {
   static String buildUpdateCurrentUserProfileUrl() {
     return '$baseUrl$updateCurrentUserProfile';
   }
+
+  // ==================== ADMIN DASHBOARD ENDPOINTS ====================
+  static String get adminDashboardStats => "/api/admin/dashboard/stats";
+  static String get adminRecentActivity => "/api/admin/dashboard/recent-activity";
+  static String get adminCategoryBreakdown => "/api/admin/dashboard/category-breakdown";
+  
+  
+  
+  static String buildAdminDashboardStatsUrl() {
+    return '$baseUrl$adminDashboardStats';
+  }
+  
+  static String buildAdminRecentActivityUrl() {
+    return '$baseUrl$adminRecentActivity';
+  }
+  
+  static String buildAdminCategoryBreakdownUrl() {
+    return '$baseUrl$adminCategoryBreakdown';
+  
+  }
 }

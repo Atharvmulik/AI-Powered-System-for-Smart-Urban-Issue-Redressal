@@ -6,6 +6,7 @@ import '../report/issuereport.dart' as report;
 import '../../services/api_service.dart'; 
 import '../../pages/user_profile.dart';
 import '../../pages/user_report_page.dart';
+import '../../pages/map_view.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String userEmail;
@@ -303,7 +304,7 @@ Widget build(BuildContext context) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => NearbyIssuesPage(),
+                          builder: (context) => AdminMapViewPage(),
                         ),
                       );
                     }),

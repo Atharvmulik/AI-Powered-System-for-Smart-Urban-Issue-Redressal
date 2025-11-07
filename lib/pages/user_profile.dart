@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../../pages/report_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   final String userEmail;
@@ -153,31 +154,35 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   void _logout() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to logout?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Logged out successfully!")),
-              );
-              // Navigate to login page
-              // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginPage()));
-            },
-            child: const Text("Logout", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Logout"),
+      content: const Text("Are you sure you want to logout?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context); // Close the dialog
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Logged out successfully!")),
+            );
+            // Navigate to login page and remove all previous routes
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => LoginSignupPage()), // Replace with your actual login page
+              (route) => false, // This removes all previous routes
+            );
+          },
+          child: const Text("Logout", style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

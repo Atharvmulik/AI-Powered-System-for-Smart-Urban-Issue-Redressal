@@ -193,6 +193,19 @@ Future<http.Response> getMapStats() async {
       'new_status': newStatus,
     });
   }
+   Future<http.Response> getAdminDashboardStats() async {
+    return await get(ApiConfig.adminDashboardStats);
+  }
+  
+  // Get recent activity for admin dashboard
+  Future<http.Response> getAdminRecentActivity() async {
+    return await get(ApiConfig.adminRecentActivity);
+  }
+  
+  // Get category breakdown for admin dashboard
+  Future<http.Response> getAdminCategoryBreakdown() async {
+    return await get(ApiConfig.adminCategoryBreakdown);
+  }
 
   // ==================== ADMIN ENDPOINTS ====================
 
