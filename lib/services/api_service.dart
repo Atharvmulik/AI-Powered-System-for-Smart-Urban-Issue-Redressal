@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/admin_issue_model.dart';
@@ -18,55 +19,58 @@ class ApiService {
 
   // Get headers with authentication
   Map<String, String> getHeaders() {
-    final headers = {
-      'Content-Type': 'application/json',
-    };
-    
+    final headers = {'Content-Type': 'application/json'};
+
     if (_token != null) {
       headers['Authorization'] = 'Bearer $_token';
     }
-    
+
     return headers;
   }
 
-// ==================== MAP ENDPOINTS ====================
+  // ==================== MAP ENDPOINTS ====================
 
-// Get all issues with coordinates for map
-Future<http.Response> getMapIssues({String? status, String? category}) async {
-  final url = ApiConfig.buildMapIssuesUrl(status: status, category: category);
-  return await get(url);
-}
+  // Get all issues with coordinates for map
+  Future<http.Response> getMapIssues({String? status, String? category}) async {
+    final url = ApiConfig.buildMapIssuesUrl(status: status, category: category);
+    return await get(url);
+  }
 
-// Get issues within geographic bounds
-Future<http.Response> getIssuesInBounds(double north, double south, double east, double west) async {
-  final url = ApiConfig.buildMapIssuesInBoundsUrl(north, south, east, west);
-  return await get(url);
-}
+  // Get issues within geographic bounds
+  Future<http.Response> getIssuesInBounds(
+    double north,
+    double south,
+    double east,
+    double west,
+  ) async {
+    final url = ApiConfig.buildMapIssuesInBoundsUrl(north, south, east, west);
+    return await get(url);
+  }
 
-// Get map statistics
-Future<http.Response> getMapStats() async {
-  final url = ApiConfig.buildMapStatsUrl();
-  return await get(url);
-}
+  // Get map statistics
+  Future<http.Response> getMapStats() async {
+    final url = ApiConfig.buildMapStatsUrl();
+    return await get(url);
+  }
 
-  // ==================== EXISTING METHODS BELOW - NO CHANGES ====================
+  // ==================== CORE HTTP METHODS ====================
 
-  // ✅ Generic POST method
+  // Generic POST method
   Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
     try {
       final url = '$baseUrl$endpoint';
       print('🌐 POST Request to: $url');
       print('📦 Request Data: $data');
-      
+
       final response = await http.post(
         Uri.parse(url),
         headers: getHeaders(),
         body: json.encode(data),
       );
-      
+
       print('📡 Response Status: ${response.statusCode}');
       print('📄 Response Body: ${response.body}');
-      
+
       return response;
     } catch (e) {
       print('❌ POST Error: $e');
@@ -74,22 +78,25 @@ Future<http.Response> getMapStats() async {
     }
   }
 
-  // ✅ Generic PATCH method
-  Future<http.Response> patch(String endpoint, Map<String, dynamic> data) async {
+  // Generic PATCH method
+  Future<http.Response> patch(
+    String endpoint,
+    Map<String, dynamic> data,
+  ) async {
     try {
       final url = '$baseUrl$endpoint';
       print('🌐 PATCH Request to: $url');
       print('📦 Request Data: $data');
-      
+
       final response = await http.patch(
         Uri.parse(url),
         headers: getHeaders(),
         body: json.encode(data),
       );
-      
+
       print('📡 Response Status: ${response.statusCode}');
       print('📄 Response Body: ${response.body}');
-      
+
       return response;
     } catch (e) {
       print('❌ PATCH Error: $e');
@@ -97,17 +104,14 @@ Future<http.Response> getMapStats() async {
     }
   }
 
-  // ✅ Generic GET method
+  // Generic GET method
   Future<http.Response> get(String endpoint) async {
     try {
       final url = '$baseUrl$endpoint';
       print('🌐 GET Request to: $url');
-      
-      final response = await http.get(
-        Uri.parse(url),
-        headers: getHeaders(),
-      );
-      
+
+      final response = await http.get(Uri.parse(url), headers: getHeaders());
+
       print('📡 Response Status: ${response.statusCode}');
       return response;
     } catch (e) {
@@ -116,22 +120,213 @@ Future<http.Response> getMapStats() async {
     }
   }
 
-  // ✅ GET with query parameters
-  Future<http.Response> getWithParams(String endpoint, Map<String, String> params) async {
+  // GET with query parameters
+  Future<http.Response> getWithParams(
+    String endpoint,
+    Map<String, String> params,
+  ) async {
     try {
-      final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: params);
+      final uri = Uri.parse(
+        '$baseUrl$endpoint',
+      ).replace(queryParameters: params);
       print('🌐 GET Request to: $uri');
-      
-      final response = await http.get(
-        uri,
-        headers: getHeaders(),
-      );
-      
+
+      final response = await http.get(uri, headers: getHeaders());
+
       print('📡 Response Status: ${response.statusCode}');
       return response;
     } catch (e) {
       print('❌ GET Error: $e');
       throw Exception('Network error: $e');
+    }
+  }
+
+  // PUT with parameters method
+  Future<http.Response> putWithParams(
+    String endpoint,
+    Map<String, dynamic> data,
+    Map<String, String> params,
+  ) async {
+    try {
+      final uri = Uri.parse(
+        '$baseUrl$endpoint',
+      ).replace(queryParameters: params);
+      print('🌐 PUT Request to: $uri');
+      print('📦 Request Data: $data');
+
+      final response = await http.put(
+        uri,
+        headers: getHeaders(),
+        body: json.encode(data),
+      );
+
+      print('📡 Response Status: ${response.statusCode}');
+      print('📄 Response Body: ${response.body}');
+
+      return response;
+    } catch (e) {
+      print('❌ PUT Error: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  // ==================== AI AUTO-ASSIGNMENT ENDPOINTS ====================
+
+  // Trigger AI auto-assignment for unassigned issues
+  Future<http.Response> triggerAIAssignment({
+    bool forceReassign = false,
+    String priority = 'medium',
+  }) async {
+    try {
+      final response = await post('/api/ai/auto-assign', {
+        'force_reassign': forceReassign,
+        'priority': priority,
+      });
+
+      print('🤖 AI Assignment Response: ${response.statusCode}');
+      return response;
+    } catch (e) {
+      print('❌ AI Assignment error: $e');
+      return http.Response('Error: $e', 500);
+    }
+  }
+
+  // Get AI assignment status and statistics
+  Future<http.Response> getAIAssignmentStatus() async {
+    try {
+      final response = await get('/api/ai/assignment-status');
+      return response;
+    } catch (e) {
+      print('❌ AI Assignment status error: $e');
+      return http.Response('Error: $e', 500);
+    }
+  }
+
+  // Get auto-assigned issues for a specific department
+  Future<http.Response> getAutoAssignedIssues(
+    String department, {
+    String period = 'month',
+  }) async {
+    try {
+      final response = await getWithParams('/api/ai/auto-assigned-issues', {
+        'department': department,
+        'period': period,
+      });
+      return response;
+    } catch (e) {
+      print('❌ Auto-assigned issues error: $e');
+      return http.Response('Error: $e', 500);
+    }
+  }
+
+  // ==================== AI PREDICTION METHODS ====================
+
+  Future<Map<String, dynamic>> predictDepartment({
+    required String description,
+    String? imagePath,
+  }) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/predict-department'),
+      );
+
+      // Add description field
+      request.fields['description'] = description;
+
+      // Add image file if provided
+      if (imagePath != null && await File(imagePath).exists()) {
+        request.files.add(
+          await http.MultipartFile.fromPath('image', imagePath),
+        );
+      }
+
+      // Add headers (remove Content-Type for multipart)
+      final headers = Map<String, String>.from(getHeaders());
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+
+      print(
+        '🤖 AI Prediction Request - Text: $description, Image: ${imagePath != null}',
+      );
+
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+
+      print(
+        '🤖 AI Prediction Response: ${response.statusCode} - $responseData',
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(responseData);
+      } else {
+        throw Exception('AI prediction failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ AI Prediction Error: $e');
+      throw Exception('AI prediction failed: $e');
+    }
+  }
+
+  /// Predict department from text only
+  Future<Map<String, dynamic>> predictTextOnly(String description) async {
+    try {
+      final response = await post('/predict-text-only', {
+        'description': description,
+      });
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Text prediction failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Text Prediction Error: $e');
+      throw Exception('Text prediction failed: $e');
+    }
+  }
+
+  Future<http.Response> createReportWithAutoDepartment(
+    Map<String, dynamic> reportData, {
+    String? imagePath,
+  }) async {
+    try {
+      final String description = reportData['description'] ?? '';
+
+      // Step 1: Get AI prediction for department
+      print('🤖 Step 1: Getting AI prediction...');
+      final prediction = await predictDepartment(
+        description: description,
+        imagePath: imagePath,
+      );
+
+      print('🎯 AI Prediction Result: ${prediction['final_department']}');
+      print('📊 Confidence: ${prediction['final_confidence']}%');
+
+      // Step 2: ✅ FIXED: Update reportData with prediction results
+      final enhancedReportData = Map<String, dynamic>.from(reportData);
+      enhancedReportData['department'] =
+          prediction['final_department'] ?? 'other';
+      enhancedReportData['auto_assigned'] = true;
+      enhancedReportData['prediction_confidence'] =
+          prediction['final_confidence'];
+
+      print('📦 Enhanced Report Data: $enhancedReportData');
+
+      // Step 3: Create report with enhanced data
+      print('📤 Step 2: Creating report with AI-assigned department...');
+      return await post(ApiConfig.createReport, enhancedReportData);
+    } catch (e) {
+      print('⚠️ Auto-department assignment failed: $e');
+
+      // Fallback: Create report without auto-assignment
+      final fallbackData = Map<String, dynamic>.from(reportData);
+      fallbackData['department'] = 'other';
+      fallbackData['auto_assigned'] = false;
+      fallbackData['prediction_confidence'] = null;
+
+      print('📤 Fallback: Creating report without AI assignment');
+      return await post(ApiConfig.createReport, fallbackData);
     }
   }
 
@@ -145,7 +340,10 @@ Future<http.Response> getMapStats() async {
   }
 
   // Get department details
-  Future<http.Response> getDepartmentDetails(int deptId, {String period = 'month'}) async {
+  Future<http.Response> getDepartmentDetails(
+    int deptId, {
+    String period = 'month',
+  }) async {
     return await getWithParams('${ApiConfig.departmentDetails}/$deptId', {
       'period': period,
     });
@@ -153,55 +351,62 @@ Future<http.Response> getMapStats() async {
 
   // Get issues by department for bar chart
   Future<http.Response> getDepartmentIssues({String period = 'month'}) async {
-    return await getWithParams(ApiConfig.departmentIssues, {
-      'period': period,
-    });
+    return await getWithParams(ApiConfig.departmentIssues, {'period': period});
   }
 
   // Get resolution trends
   Future<http.Response> getResolutionTrends({String period = 'month'}) async {
-    return await getWithParams(ApiConfig.resolutionTrends, {
-      'period': period,
-    });
+    return await getWithParams(ApiConfig.resolutionTrends, {'period': period});
   }
 
   // Get department efficiency trend
-  Future<http.Response> getDepartmentEfficiencyTrend(int deptId, {int months = 6}) async {
-    return await getWithParams('${ApiConfig.departmentEfficiencyTrend}/$deptId/efficiency-trend', {
-      'months': months.toString(),
-    });
+  Future<http.Response> getDepartmentEfficiencyTrend(
+    int deptId, {
+    int months = 6,
+  }) async {
+    return await getWithParams(
+      '${ApiConfig.departmentEfficiencyTrend}/$deptId/efficiency-trend',
+      {'months': months.toString()},
+    );
   }
 
   // Submit department feedback
-  Future<http.Response> submitDepartmentFeedback(int departmentId, String feedbackText, {int? rating, String? userName}) async {
-    final data = {
-      'department_id': departmentId,
-      'feedback_text': feedbackText,
-    };
-    
+  Future<http.Response> submitDepartmentFeedback(
+    int departmentId,
+    String feedbackText, {
+    int? rating,
+    String? userName,
+  }) async {
+    final data = {'department_id': departmentId, 'feedback_text': feedbackText};
+
     if (rating != null) data['rating'] = rating;
     if (userName != null) data['user_name'] = userName;
-    
+
     return await post(ApiConfig.departmentFeedback, data);
   }
 
   // Update issues status in bulk
-  Future<http.Response> updateIssuesStatus(int departmentId, List<int> issueIds, String newStatus) async {
+  Future<http.Response> updateIssuesStatus(
+    int departmentId,
+    List<int> issueIds,
+    String newStatus,
+  ) async {
     return await post(ApiConfig.updateIssuesStatus, {
       'department_id': departmentId,
       'issue_ids': issueIds,
       'new_status': newStatus,
     });
   }
-   Future<http.Response> getAdminDashboardStats() async {
+
+  Future<http.Response> getAdminDashboardStats() async {
     return await get(ApiConfig.adminDashboardStats);
   }
-  
+
   // Get recent activity for admin dashboard
   Future<http.Response> getAdminRecentActivity() async {
     return await get(ApiConfig.adminRecentActivity);
   }
-  
+
   // Get category breakdown for admin dashboard
   Future<http.Response> getAdminCategoryBreakdown() async {
     return await get(ApiConfig.adminCategoryBreakdown);
@@ -210,28 +415,39 @@ Future<http.Response> getMapStats() async {
   // ==================== ADMIN ENDPOINTS ====================
 
   // Get all issues for admin - UPDATED FOR STRING STATUS
-  Future<http.Response> getAdminIssues({String? status, String? department}) async {
+  Future<http.Response> getAdminIssues({
+    String? status,
+    String? department,
+  }) async {
     final params = <String, String>{};
     if (status != null && status != 'all') params['status'] = status;
     if (department != null) params['department'] = department;
-    
+
     return await getWithParams('/api/admin/issues', params);
   }
 
   // Get all admin issues as List<AdminIssue>
-  Future<List<AdminIssue>> getAdminIssuesList({String? status, String? department}) async {
+  Future<List<AdminIssue>> getAdminIssuesList({
+    String? status,
+    String? department,
+  }) async {
     try {
-      final response = await getAdminIssues(status: status, department: department);
-      
+      final response = await getAdminIssues(
+        status: status,
+        department: department,
+      );
+
       print('🔍 Raw API Response: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         final List<dynamic> issuesJson = data['issues'] ?? [];
-        
+
         print('🔍 Number of issues received: ${issuesJson.length}');
-        
-        List<AdminIssue> issues = issuesJson.map((json) => AdminIssue.fromJson(json)).toList();
+
+        List<AdminIssue> issues = issuesJson
+            .map((json) => AdminIssue.fromJson(json))
+            .toList();
         return issues;
       } else {
         print('❌ API Error: ${response.statusCode} - ${response.body}');
@@ -256,7 +472,10 @@ Future<http.Response> getMapStats() async {
   }
 
   // Assign issue to department - UPDATED FOR STRING STATUS
-  Future<http.Response> assignToDepartment(int reportId, String department) async {
+  Future<http.Response> assignToDepartment(
+    int reportId,
+    String department,
+  ) async {
     return await patch('/api/admin/issues/$reportId/assign', {
       'department': department,
     });
@@ -267,12 +486,9 @@ Future<http.Response> getMapStats() async {
     try {
       final url = '$baseUrl/api/admin/issues/$reportId';
       print('🌐 DELETE Request to: $url');
-      
-      final response = await http.delete(
-        Uri.parse(url),
-        headers: getHeaders(),
-      );
-      
+
+      final response = await http.delete(Uri.parse(url), headers: getHeaders());
+
       print('📡 Response Status: ${response.statusCode}');
       return response;
     } catch (e) {
@@ -282,7 +498,11 @@ Future<http.Response> getMapStats() async {
   }
 
   // Resolve issue - UPDATED FOR STRING STATUS
-  Future<http.Response> resolveIssue(int reportId, String resolutionNotes, String resolvedBy) async {
+  Future<http.Response> resolveIssue(
+    int reportId,
+    String resolutionNotes,
+    String resolvedBy,
+  ) async {
     return await post('/api/admin/issues/$reportId/resolve', {
       'resolution_notes': resolutionNotes,
       'resolved_by': resolvedBy,
@@ -294,48 +514,36 @@ Future<http.Response> getMapStats() async {
     return await get('/api/admin/departments');
   }
 
-  // Update these methods in your ApiService class
-
   // Get user profile by email (NO AUTH REQUIRED)
   Future<http.Response> getUserProfileByEmail(String email) async {
-    return await getWithParams('/api/users/profile', {
-      'email': email,
-    });
+    return await getWithParams('/api/users/profile', {'email': email});
   }
 
   // Update user profile by email (NO AUTH REQUIRED)
-  Future<http.Response> updateUserProfile(String email, Map<String, dynamic> profileData) async {
+  Future<http.Response> updateUserProfile(
+    String email,
+    Map<String, dynamic> profileData,
+  ) async {
     return await putWithParams('/api/users/profile', profileData, {
       'email': email,
     });
   }
 
-  // Add this PUT with parameters method
-  Future<http.Response> putWithParams(String endpoint, Map<String, dynamic> data, Map<String, String> params) async {
-    try {
-      final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: params);
-      print('🌐 PUT Request to: $uri');
-      print('📦 Request Data: $data');
-      
-      final response = await http.put(
-        uri,
-        headers: getHeaders(),
-        body: json.encode(data),
-      );
-      
-      print('📡 Response Status: ${response.statusCode}');
-      print('📄 Response Body: ${response.body}');
-      
-      return response;
-    } catch (e) {
-      print('❌ PUT Error: $e');
-      throw Exception('Network error: $e');
-    }
+  // ==================== AUTHENTICATION ENDPOINTS ====================
+
+  Future<http.Response> login(String email, String password) async {
+    return await post(ApiConfig.loginEndpoint, {
+      'email': email,
+      'password': password,
+    });
   }
 
-  // ==================== EXISTING ENDPOINTS ====================
-
-  Future<http.Response> register(String email, String password, String fullName, String mobileNumber) async {
+  Future<http.Response> register(
+    String email,
+    String password,
+    String fullName,
+    String mobileNumber,
+  ) async {
     return await post(ApiConfig.registerEndpoint, {
       'email': email,
       'password': password,
@@ -344,6 +552,8 @@ Future<http.Response> getMapStats() async {
       'is_admin': false,
     });
   }
+
+  // ==================== DASHBOARD ENDPOINTS ====================
 
   // Dashboard Data (PUBLIC - no auth required)
   Future<http.Response> getDashboardSummary() async {
@@ -366,7 +576,7 @@ Future<http.Response> getMapStats() async {
     return await get(ApiConfig.categorySummary);
   }
 
-  // 1. NEW - For dashboard
+  // For dashboard
   Future<http.Response> getUserReportsForDashboard(String userEmail) async {
     return await getWithParams('/users/reports/filtered', {
       'user_email': userEmail,
@@ -374,8 +584,11 @@ Future<http.Response> getMapStats() async {
     });
   }
 
-  // 2. NEW - For filtering
-  Future<http.Response> getUserReports(String userEmail, {String statusFilter = 'all'}) async {
+  // For filtering
+  Future<http.Response> getUserReports(
+    String userEmail, {
+    String statusFilter = 'all',
+  }) async {
     return await getWithParams('/users/reports/filtered', {
       'user_email': userEmail,
       'status_filter': statusFilter,
@@ -383,7 +596,11 @@ Future<http.Response> getMapStats() async {
   }
 
   // Nearby Issues (PUBLIC)
-  Future<http.Response> getNearbyIssues(double lat, double lng, {double radius = 5.0}) async {
+  Future<http.Response> getNearbyIssues(
+    double lat,
+    double lng, {
+    double radius = 5.0,
+  }) async {
     return await getWithParams(ApiConfig.nearbyIssues, {
       'lat': lat.toString(),
       'long': lng.toString(),
@@ -392,14 +609,20 @@ Future<http.Response> getMapStats() async {
   }
 
   // User Complaints (PUBLIC - uses user_email parameter)
-  Future<http.Response> getUserReportsFiltered(String userEmail, {String statusFilter = 'all'}) async {
+  Future<http.Response> getUserReportsFiltered(
+    String userEmail, {
+    String statusFilter = 'all',
+  }) async {
     return await getWithParams(ApiConfig.userReportsFiltered, {
       'user_email': userEmail,
       'status_filter': statusFilter,
     });
   }
 
-  Future<http.Response> searchUserReports(String userEmail, String query) async {
+  Future<http.Response> searchUserReports(
+    String userEmail,
+    String query,
+  ) async {
     return await getWithParams(ApiConfig.userReportsSearch, {
       'user_email': userEmail,
       'query': query,
@@ -410,6 +633,8 @@ Future<http.Response> getMapStats() async {
   Future<http.Response> getReportTimeline(int reportId) async {
     return await get('${ApiConfig.reportTimeline}/$reportId/timeline');
   }
+
+  // ==================== REFERENCE DATA ENDPOINTS ====================
 
   // Reference Data (PUBLIC)
   Future<http.Response> getCategories() async {
@@ -423,6 +648,8 @@ Future<http.Response> getMapStats() async {
   Future<http.Response> getStatuses() async {
     return await get(ApiConfig.statuses);
   }
+
+  // ==================== REPORT ENDPOINTS ====================
 
   // Create Report (may require auth depending on your implementation)
   Future<http.Response> createReport(Map<String, dynamic> reportData) async {
@@ -452,16 +679,20 @@ Future<http.Response> getMapStats() async {
     return await get('${ApiConfig.getIssuesEndpoint}$reportId');
   }
 
-  // ✅ Helper method to parse response
+  // ==================== HELPER METHODS ====================
+
+  // Helper method to parse response
   static Map<String, dynamic> parseResponse(http.Response response) {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return json.decode(response.body);
     } else {
-      throw Exception('Request failed with status: ${response.statusCode}. ${response.body}');
+      throw Exception(
+        'Request failed with status: ${response.statusCode}. ${response.body}',
+      );
     }
   }
 
-  // ✅ Helper method to check if response is successful
+  // Helper method to check if response is successful
   static bool isSuccess(http.Response response) {
     return response.statusCode >= 200 && response.statusCode < 300;
   }

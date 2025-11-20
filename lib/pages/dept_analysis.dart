@@ -1,8 +1,9 @@
-// analytics_page.dart
+// analytics_page.dart - FIXED VERSION
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/api_service.dart';
 import 'dart:convert';
+import 'dart:async';
 
 class DepartmentAnalysisPage extends StatefulWidget {
   const DepartmentAnalysisPage({super.key});
@@ -20,114 +21,379 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
   List<dynamic> resolutionTrends = [];
 
   final ApiService apiService = ApiService();
-
+  Timer? _refreshTimer;
   @override
   void initState() {
     super.initState();
     _loadDepartmentData();
+    _startAutoRefresh();
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(Duration(seconds: 30), (timer) {
+      if (mounted) {
+        print('🔄 Auto-refreshing department data...');
+        _loadDepartmentData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadDepartmentData();
+  }
+
+  String _formatDeptName(String dept) {
+    switch (dept.toLowerCase()) {
+      case 'water_dept':
+      case 'water dept':
+        return 'Water Dept';
+      case 'road_dept':
+      case 'road dept':
+        return 'Road Dept';
+      case 'sanitation_dept':
+      case 'sanitation dept':
+        return 'Sanitation Dept';
+      case 'electricity_dept':
+      case 'electricity dept':
+        return 'Electricity Dept';
+      case 'public works':
+        return 'Public Works';
+      case 'other':
+        return 'Other';
+      default:
+        return dept;
+    }
+  }
+
+  String _getDeptInternalName(String displayName) {
+    switch (displayName) {
+      case 'Water Dept':
+        return 'water_dept';
+      case 'Road Dept':
+        return 'road_dept';
+      case 'Sanitation Dept':
+        return 'sanitation_dept';
+      case 'Electricity Dept':
+        return 'electricity_dept';
+      case 'Public Works':
+        return 'public_works';
+      case 'Other':
+        return 'other';
+      case 'All Departments':
+        return 'all';
+      default:
+        return displayName.toLowerCase().replaceAll(' ', '_');
+    }
   }
 
   Future<void> _loadDepartmentData() async {
-  try {
-    setState(() {
-      isLoading = true;
-    });
-
-    // Load departments summary
-    final departmentsResponse = await apiService.getDepartmentsSummary(period: _getPeriodParam());
-    if (departmentsResponse.statusCode == 200) {
-      final data = json.decode(departmentsResponse.body);
-      print('📊 Departments summary data: $data');
-      
-      // SAFE CONVERSION: Handle both int and double values
-      final List<dynamic> rawDepartments = data['departments'] ?? data['data'] ?? [];
-      final List<dynamic> processedDepartments = rawDepartments.map((dept) {
-        return {
-          'id': dept['id'] is int ? dept['id'] : int.tryParse(dept['id'].toString()) ?? 0,
-          'name': dept['name']?.toString() ?? 'Unknown',
-          'icon': dept['icon']?.toString() ?? 'build',
-          'resolved': dept['resolved'] is int ? dept['resolved'] : int.tryParse(dept['resolved'].toString()) ?? 0,
-          'pending': dept['pending'] is int ? dept['pending'] : int.tryParse(dept['pending'].toString()) ?? 0,
-          'progress': dept['progress'] is int ? dept['progress'] : int.tryParse(dept['progress'].toString()) ?? 0,
-          'efficiency': dept['efficiency'] is double ? dept['efficiency'] : 
-                       dept['efficiency'] is int ? dept['efficiency'].toDouble() : 
-                       double.tryParse(dept['efficiency'].toString()) ?? 0.0,
-          'total_issues': dept['total_issues'] is int ? dept['total_issues'] : 
-                         int.tryParse(dept['total_issues'].toString()) ?? 0,
-        };
-      }).toList();
-      
+    try {
       setState(() {
-        departments = processedDepartments;
+        isLoading = true;
       });
-    } else {
-      print('❌ Departments API error: ${departmentsResponse.statusCode}');
-    }
 
-    // Load department issues for bar chart
-    final issuesResponse = await apiService.getDepartmentIssues(period: _getPeriodParam());
-    if (issuesResponse.statusCode == 200) {
-      final data = json.decode(issuesResponse.body);
-      print('📊 Department issues data: $data');
-      
-      // SAFE CONVERSION for chart data
-      final List<dynamic> rawIssues = data['data'] ?? data['department_issues'] ?? [];
-      final List<dynamic> processedIssues = rawIssues.map((issue) {
-        return {
-          'department': issue['department']?.toString() ?? 'Unknown',
-          'issues_count': issue['issues_count'] is int ? issue['issues_count'].toDouble() : 
-                         issue['issues_count'] is double ? issue['issues_count'] : 
-                         double.tryParse(issue['issues_count'].toString()) ?? 0.0,
-        };
-      }).toList();
-      
-      setState(() {
-        departmentIssues = processedIssues;
-      });
-    } else {
-      print('❌ Issues API error: ${issuesResponse.statusCode}');
-    }
+      // Load departments summary
+      final departmentsResponse = await apiService.getDepartmentsSummary(
+        period: _getPeriodParam(),
+      );
 
-    // Load resolution trends
-    final trendsResponse = await apiService.getResolutionTrends(period: _getPeriodParam());
-    if (trendsResponse.statusCode == 200) {
-      final data = json.decode(trendsResponse.body);
-      print('📊 Resolution trends data: $data');
-      
-      // SAFE CONVERSION for trend data
-      final List<dynamic> rawTrends = data['trends'] ?? data['data'] ?? [];
-      final List<dynamic> processedTrends = rawTrends.map((trend) {
-        return {
-          'department': trend['department']?.toString() ?? 'Unknown',
-          'months': trend['months'] is List ? trend['months'] : [],
-          'data': trend['data'] is List ? (trend['data'] as List).map((item) {
-            return item is double ? item : 
-                   item is int ? item.toDouble() : 
-                   double.tryParse(item.toString()) ?? 0.0;
-          }).toList() : [],
-        };
-      }).toList();
-      
+      if (departmentsResponse.statusCode == 200) {
+        final data = json.decode(departmentsResponse.body);
+        print('📊 Departments summary data: $data');
+
+        final List<dynamic> rawDepartments =
+            data['departments'] ?? data['data'] ?? [];
+
+        final List<dynamic> processedDepartments = rawDepartments.map((dept) {
+          String deptName = dept['name']?.toString() ?? 'Unknown';
+          String displayName = _formatDeptName(deptName);
+
+          return {
+            'id': dept['id'] is int
+                ? dept['id']
+                : int.tryParse(dept['id'].toString()) ?? 0,
+            'name': displayName,
+            'internal_name': deptName,
+            'icon': dept['icon']?.toString() ?? 'build',
+            'resolved': dept['resolved'] is int
+                ? dept['resolved']
+                : int.tryParse(dept['resolved'].toString()) ?? 0,
+            'pending': dept['pending'] is int
+                ? dept['pending']
+                : int.tryParse(dept['pending'].toString()) ?? 0,
+            'progress': dept['progress'] is int
+                ? dept['progress']
+                : int.tryParse(dept['progress'].toString()) ?? 0,
+            'efficiency': dept['efficiency'] is double
+                ? dept['efficiency']
+                : dept['efficiency'] is int
+                ? dept['efficiency'].toDouble()
+                : double.tryParse(dept['efficiency'].toString()) ?? 0.0,
+            'total_issues': dept['total_issues'] is int
+                ? dept['total_issues']
+                : int.tryParse(dept['total_issues'].toString()) ?? 0,
+          };
+        }).toList();
+
+        // ✅ FIXED: Apply department filtering
+        List<dynamic> filteredDepartments = processedDepartments;
+        if (selectedDept != "All Departments") {
+          String targetDept = _getDeptInternalName(selectedDept);
+          filteredDepartments = processedDepartments.where((dept) {
+            String deptDisplayName = dept['name']?.toString() ?? '';
+            String deptInternalName = dept['internal_name']?.toString() ?? '';
+            return deptDisplayName == targetDept ||
+                deptInternalName == targetDept;
+          }).toList();
+        }
+
+        setState(() {
+          departments = filteredDepartments;
+        });
+
+        // In your _loadDepartmentData method, after successful API calls
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Data updated successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        print('❌ Departments API error: ${departmentsResponse.statusCode}');
+        // Fallback to demo data
+        _loadDemoData();
+      }
+
+      // Load department issues for bar chart
+      final issuesResponse = await apiService.getDepartmentIssues(
+        period: _getPeriodParam(),
+      );
+
+      if (issuesResponse.statusCode == 200) {
+        final data = json.decode(issuesResponse.body);
+        final List<dynamic> rawIssues =
+            data['data'] ?? data['department_issues'] ?? [];
+
+        final List<dynamic> processedIssues = rawIssues.map((issue) {
+          String deptName = issue['department']?.toString() ?? 'Unknown';
+          String displayName = _formatDeptName(deptName);
+
+          return {
+            'department': displayName,
+            'internal_department': deptName,
+            'issues_count': issue['issues_count'] is int
+                ? issue['issues_count'].toDouble()
+                : issue['issues_count'] is double
+                ? issue['issues_count']
+                : double.tryParse(issue['issues_count'].toString()) ?? 0.0,
+          };
+        }).toList();
+
+        // ✅ FIXED: Apply filtering to issues
+        List<dynamic> filteredIssues = processedIssues;
+        if (selectedDept != "All Departments") {
+          String targetDept = _getDeptInternalName(selectedDept);
+          filteredIssues = processedIssues.where((issue) {
+            String issueDisplayDept = issue['department']?.toString() ?? '';
+            String issueInternalDept =
+                issue['internal_department']?.toString() ?? '';
+            return issueDisplayDept == targetDept ||
+                issueInternalDept == targetDept;
+          }).toList();
+        }
+
+        setState(() {
+          departmentIssues = filteredIssues;
+        });
+      } else {
+        print('❌ Issues API error: ${issuesResponse.statusCode}');
+      }
+
+      // Load resolution trends
+      final trendsResponse = await apiService.getResolutionTrends(
+        period: _getPeriodParam(),
+      );
+
+      if (trendsResponse.statusCode == 200) {
+        final data = json.decode(trendsResponse.body);
+        final List<dynamic> rawTrends = data['trends'] ?? data['data'] ?? [];
+
+        final List<dynamic> processedTrends = rawTrends.map((trend) {
+          String deptName = trend['department']?.toString() ?? 'Unknown';
+          String displayName = _formatDeptName(deptName);
+
+          return {
+            'department': displayName,
+            'internal_department': deptName,
+            'months': trend['months'] is List ? trend['months'] : [],
+            'data': trend['data'] is List
+                ? (trend['data'] as List).map((item) {
+                    return item is double
+                        ? item
+                        : item is int
+                        ? item.toDouble()
+                        : double.tryParse(item.toString()) ?? 0.0;
+                  }).toList()
+                : [],
+          };
+        }).toList();
+
+        // ✅ FIXED: Apply filtering to trends
+        List<dynamic> filteredTrends = processedTrends;
+        if (selectedDept != "All Departments") {
+          String targetDept = _getDeptInternalName(selectedDept);
+          filteredTrends = processedTrends.where((trend) {
+            String trendDisplayDept = trend['department']?.toString() ?? '';
+            String trendInternalDept =
+                trend['internal_department']?.toString() ?? '';
+            return trendDisplayDept == targetDept ||
+                trendInternalDept == targetDept;
+          }).toList();
+        }
+
+        setState(() {
+          resolutionTrends = filteredTrends;
+        });
+      } else {
+        print('❌ Trends API error: ${trendsResponse.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error loading department data: $e');
+      // Fallback to demo data
+      _loadDemoData();
+    } finally {
       setState(() {
-        resolutionTrends = processedTrends;
+        isLoading = false;
       });
-    } else {
-      print('❌ Trends API error: ${trendsResponse.statusCode}');
     }
-  } catch (e) {
-    print('❌ Error loading department data: $e');
-    // Fallback to empty data
+  }
+
+  Future<void> _triggerAIAssignment() async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+
+      final response = await apiService.triggerAIAssignment();
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              data['message'] ?? 'AI Assignment completed successfully',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Reload data to show updated assignments
+        _loadDepartmentData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('AI Assignment failed: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('AI Assignment error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // Demo data fallback
+  void _loadDemoData() {
     setState(() {
-      departments = [];
-      departmentIssues = [];
-      resolutionTrends = [];
-    });
-  } finally {
-    setState(() {
-      isLoading = false;
+      departments = [
+        {
+          'id': 1,
+          'name': 'Water Dept',
+          'internal_name': 'Water Dept',
+          'icon': 'water_drop',
+          'resolved': 45,
+          'pending': 12,
+          'progress': 8,
+          'efficiency': 85.2,
+          'total_issues': 65,
+        },
+        {
+          'id': 2,
+          'name': 'Road Dept',
+          'internal_name': 'Road Dept',
+          'icon': 'traffic',
+          'resolved': 38,
+          'pending': 15,
+          'progress': 7,
+          'efficiency': 72.8,
+          'total_issues': 60,
+        },
+        {
+          'id': 3,
+          'name': 'Sanitation Dept',
+          'internal_name': 'Sanitation Dept',
+          'icon': 'clean_hands',
+          'resolved': 52,
+          'pending': 8,
+          'progress': 5,
+          'efficiency': 92.5,
+          'total_issues': 65,
+        },
+        {
+          'id': 4,
+          'name': 'Electricity Dept',
+          'internal_name': 'Electricity Dept',
+          'icon': 'lightbulb',
+          'resolved': 41,
+          'pending': 14,
+          'progress': 10,
+          'efficiency': 78.3,
+          'total_issues': 65,
+        },
+      ];
+
+      departmentIssues = [
+        {'department': 'Water Dept', 'issues_count': 65.0},
+        {'department': 'Road Dept', 'issues_count': 60.0},
+        {'department': 'Sanitation Dept', 'issues_count': 65.0},
+        {'department': 'Electricity Dept', 'issues_count': 65.0},
+      ];
+
+      resolutionTrends = [
+        {
+          'department': 'Water Dept',
+          'months': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+          'data': [65.0, 72.0, 78.0, 82.0, 85.0, 85.2],
+        },
+        {
+          'department': 'Road Dept',
+          'months': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+          'data': [70.0, 75.0, 80.0, 85.0, 90.0, 92.5],
+        },
+      ];
     });
   }
-}
+
   String _getPeriodParam() {
     switch (selectedPeriod) {
       case "This Week":
@@ -168,245 +434,389 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Modern Header
-              Container(
-                margin: const EdgeInsets.all(20),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [primaryColor, secondaryColor],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+        child: RefreshIndicator(
+          onRefresh: _loadDepartmentData,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // HEADER BOX
+                // REPLACE YOUR CURRENT HEADER CONTAINER WITH THIS CODE:
+                Container(
+                  margin: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withOpacity(0.3),
-                      blurRadius: 25,
-                      offset: const Offset(0, 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [primaryColor, secondaryColor],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withOpacity(0.3),
+                        blurRadius: 25,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.analytics_outlined,
+                              color: Colors.white,
+                              size: 26,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.analytics_outlined,
-                            color: Colors.white,
-                            size: 26,
+                          const SizedBox(width: 16),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Department Analysis",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  "Track AI-assigned issues & performance",
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Department Analysis",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.5,
+                          // REFRESH BUTTON ADDED HERE
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.refresh,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              onPressed: _loadDepartmentData,
+                              tooltip: 'Refresh Data',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // YOUR EXISTING FILTER ROW CODE CONTINUES HERE...
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 46,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
                                 ),
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                "Track performance and efficiency",
-                                style: TextStyle(
+                              child: DropdownButton<String>(
+                                value: selectedDept,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                icon: const Icon(
+                                  Icons.expand_more,
                                   color: Colors.white70,
+                                  size: 20,
+                                ),
+                                dropdownColor: secondaryColor,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                items:
+                                    [
+                                      "All Departments",
+                                      "Water Dept",
+                                      "Road Dept",
+                                      "Sanitation Dept",
+                                      "Electricity Dept",
+                                      "Public Works",
+                                    ].map((e) {
+                                      return DropdownMenuItem<String>(
+                                        value: e,
+                                        child: Text(e),
+                                      );
+                                    }).toList(),
+                                onChanged: (v) {
+                                  setState(() => selectedDept = v!);
+                                  _loadDepartmentData();
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Container(
+                              height: 46,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
+                                ),
+                              ),
+                              child: DropdownButton<String>(
+                                value: selectedPeriod,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                icon: const Icon(
+                                  Icons.expand_more,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                                dropdownColor: secondaryColor,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                items: ["This Week", "This Month", "This Year"]
+                                    .map((e) {
+                                      return DropdownMenuItem<String>(
+                                        value: e,
+                                        child: Text(e),
+                                      );
+                                    })
+                                    .toList(),
+                                onChanged: (v) {
+                                  setState(() => selectedPeriod = v!);
+                                  _loadDepartmentData();
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // MAIN CONTENT SECTION
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      // AI BUTTON
+                      if (selectedDept == "All Departments")
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ElevatedButton.icon(
+                            onPressed: _triggerAIAssignment,
+                            icon: const Icon(Icons.auto_awesome, size: 18),
+                            label: const Text("Run AI Auto-Assignment"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF7209B7),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // ACTIVE FILTER BADGE
+                      if (selectedDept != "All Departments")
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: primaryColor.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.filter_alt,
+                                size: 16,
+                                color: primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Filtered by: $selectedDept',
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.w600,
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(
+                                    () => selectedDept = "All Departments",
+                                  );
+                                  _loadDepartmentData();
+                                },
+                                child: Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: primaryColor,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Modern Filter Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 46,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withOpacity(0.2)),
-                            ),
-                            child: DropdownButton<String>(
-                              value: selectedDept,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              icon: const Icon(Icons.expand_more, color: Colors.white70, size: 20),
-                              dropdownColor: secondaryColor,
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                              items: ["All Departments", "Water Dept", "Road Dept", "Sanitation Dept", "Electricity Dept"]
-                                  .map((e) => DropdownMenuItem<String>(
-                                        value: e,
-                                        child: Text(e),
-                                      ))
+
+                      const SizedBox(height: 12),
+
+                      // GRID SECTION
+                      isLoading
+                          ? _buildLoadingGrid()
+                          : departments.isEmpty
+                          ? _buildEmptyState()
+                          : GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.85,
+                              children: departments
+                                  .map(
+                                    (dept) => _buildModernDepartmentCard(
+                                      id: dept['id'],
+                                      name: dept['name'],
+                                      icon: _getIconFromString(dept['icon']),
+                                      resolved: dept['resolved'],
+                                      pending: dept['pending'],
+                                      progress: dept['progress'],
+                                      efficiency: dept['efficiency'],
+                                      totalIssues: dept['total_issues'],
+                                    ),
+                                  )
                                   .toList(),
-                              onChanged: (v) => setState(() => selectedDept = v!),
                             ),
+
+                      const SizedBox(height: 24),
+
+                      // PERFORMANCE OVERVIEW TITLE
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Performance Overview",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                            letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Container(
-                            height: 46,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withOpacity(0.2)),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // BAR CHART CARD
+                      Container(
+                        decoration: _modernCardDecoration(),
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Issues by Department",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
                             ),
-                            child: DropdownButton<String>(
-                              value: selectedPeriod,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              icon: const Icon(Icons.expand_more, color: Colors.white70, size: 20),
-                              dropdownColor: secondaryColor,
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                              items: ["This Week", "This Month", "This Year"]
-                                  .map((e) => DropdownMenuItem<String>(
-                                        value: e,
-                                        child: Text(e),
-                                      ))
-                                  .toList(),
-                              onChanged: (v) {
-                                setState(() => selectedPeriod = v!);
-                                _loadDepartmentData();
-                              },
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: 240,
+                              child: _OverviewBarChart(
+                                departmentIssues: departmentIssues,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // RESOLUTION TREND CHART
+                      Container(
+                        decoration: _modernCardDecoration(),
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Resolution Trend Analysis",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: 200,
+                              child: _ResolutionTrendChart(
+                                resolutionTrends: resolutionTrends,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Department Cards Grid
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: isLoading
-                    ? _buildLoadingGrid()
-                    : GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 0.85,
-                        children: departments.map((dept) => _buildModernDepartmentCard(
-                          id: dept['id'],
-                          name: dept['name'],
-                          icon: _getIconFromString(dept['icon']),
-                          resolved: dept['resolved'],
-                          pending: dept['pending'],
-                          progress: dept['progress'],
-                          efficiency: dept['efficiency'],
-                          totalIssues: dept['total_issues'],
-                        )).toList(),
-                      ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Charts Section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 20),
-                      child: Text(
-                        "Performance Overview",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: textPrimary,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ),
-                    
-                    // Bar Chart
-                    Container(
-                      decoration: _modernCardDecoration(),
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Issues by Department",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 240,
-                            child: _OverviewBarChart(departmentIssues: departmentIssues),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Resolution Trend Analysis Chart
-                    Container(
-                      decoration: _modernCardDecoration(),
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Resolution Trend Analysis",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 200,
-                            child: _ResolutionTrendChart(resolutionTrends: resolutionTrends),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -421,74 +831,103 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
       childAspectRatio: 0.85,
-      children: List.generate(4, (index) => buildLoadingCard()),
+      children: List.generate(4, (index) => _buildLoadingCard()),
     );
   }
 
-  Widget buildLoadingCard() {
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF1F1F1F).withOpacity(0.08),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              CircleAvatar(radius: 22, backgroundColor: Color(0xFFE5E7EB)),
-              Container(
-                width: 40,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Color(0xFFE5E7EB),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            height: 16,
-            color: Color(0xFFE5E7EB),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            width: 60,
-            height: 12,
-            color: Color(0xFFE5E7EB),
-          ),
-          const SizedBox(height: 16),
-          LinearProgressIndicator(
-            value: 0.5,
-            backgroundColor: Color(0xFFF3F4F6),
-            color: Color(0xFFD1D5DB),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _LoadingMiniStat(),
-              _LoadingMiniStat(),
-              _LoadingMiniStat(),
-            ],
+  Widget _buildLoadingCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1F1F1F).withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-    ),
-  );
-}
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CircleAvatar(radius: 22, backgroundColor: Color(0xFFE5E7EB)),
+                Container(
+                  width: 40,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              height: 16,
+              color: Color(0xFFE5E7EB),
+            ),
+            const SizedBox(height: 6),
+            Container(width: 60, height: 12, color: Color(0xFFE5E7EB)),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              value: 0.5,
+              backgroundColor: Color(0xFFF3F4F6),
+              color: Color(0xFFD1D5DB),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _LoadingMiniStat(),
+                _LoadingMiniStat(),
+                _LoadingMiniStat(),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'No departments found',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try changing your filters or check backend connection',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadDepartmentData,
+              child: Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildModernDepartmentCard({
     required int id,
@@ -500,11 +939,14 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
     required double efficiency,
     required int totalIssues,
   }) {
-    double successRate = (resolved / (totalIssues == 0 ? 1 : totalIssues)) * 100;
+    double successRate =
+        (resolved / (totalIssues == 0 ? 1 : totalIssues)) * 100;
 
-    Color efficiencyColor = efficiency >= 85 ? const Color(0xFF4ADE80) : 
-                           efficiency >= 70 ? const Color(0xFFF59E0B) : 
-                           const Color(0xFFEF4444);
+    Color efficiencyColor = efficiency >= 85
+        ? const Color(0xFF4ADE80)
+        : efficiency >= 70
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFFEF4444);
 
     return GestureDetector(
       onTap: () {
@@ -565,21 +1007,55 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
                     ),
                     child: Icon(icon, size: 22, color: Colors.white),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: efficiencyColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: efficiencyColor.withOpacity(0.2)),
-                    ),
-                    child: Text(
-                      "${efficiency.toStringAsFixed(0)}%",
-                      style: TextStyle(
-                        color: efficiencyColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: efficiencyColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: efficiencyColor.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Text(
+                          "${efficiency.toStringAsFixed(0)}%",
+                          style: TextStyle(
+                            color: efficiencyColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
+                      // AI Auto-Assign Badge
+                      if (name != "Other" && name != "Public Works")
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.purple.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Text(
+                            "AI Auto-Assign",
+                            style: TextStyle(
+                              color: Colors.purple,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -673,23 +1149,15 @@ class _LoadingMiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 20,
-          height: 15,
-          color: Color(0xFFE5E7EB),
-        ),
+        Container(width: 20, height: 15, color: Color(0xFFE5E7EB)),
         const SizedBox(height: 2),
-        Container(
-          width: 30,
-          height: 10,
-          color: Color(0xFFE5E7EB),
-        ),
+        Container(width: 30, height: 10, color: Color(0xFFE5E7EB)),
       ],
     );
   }
 }
 
-// ---------------- Overview Bar Chart (Enhanced) ----------------
+// Bar Chart Widget
 class _OverviewBarChart extends StatelessWidget {
   final List<dynamic> departmentIssues;
   const _OverviewBarChart({required this.departmentIssues});
@@ -697,11 +1165,8 @@ class _OverviewBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     try {
-      if (departmentIssues.isEmpty) {
-        return _buildEmptyState();
-      }
+      if (departmentIssues.isEmpty) return _buildEmptyState();
 
-      // EXTRA SAFE conversion
       final List<double> data = departmentIssues.map((d) {
         try {
           final value = d['issues_count'];
@@ -712,11 +1177,10 @@ class _OverviewBarChart extends StatelessWidget {
           if (value is String) return double.tryParse(value) ?? 0.0;
           return 0.0;
         } catch (e) {
-          print('❌ Error converting chart value: $e');
           return 0.0;
         }
       }).toList();
-      
+
       final labels = departmentIssues.map((d) {
         try {
           final dept = d['department'];
@@ -725,11 +1189,11 @@ class _OverviewBarChart extends StatelessWidget {
           return 'Unknown';
         }
       }).toList();
-      
+
       if (data.isEmpty || data.every((element) => element == 0)) {
         return _buildEmptyState();
       }
-      
+
       final maxValue = data.reduce((a, b) => a > b ? a : b);
 
       return BarChart(
@@ -749,18 +1213,21 @@ class _OverviewBarChart extends StatelessWidget {
                   ),
                   width: 20,
                   borderRadius: BorderRadius.circular(8),
-                )
+                ),
               ],
             );
           }),
-          // ... rest of your chart code remains the same
           titlesData: FlTitlesData(
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 36,
                 getTitlesWidget: (v, meta) {
-                  const style = TextStyle(fontSize: 11, color: Color(0xFF8D99AE), fontWeight: FontWeight.w500);
+                  const style = TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF8D99AE),
+                    fontWeight: FontWeight.w500,
+                  );
                   final index = v.toInt();
                   if (index >= 0 && index < labels.length) {
                     String label = labels[index];
@@ -781,7 +1248,11 @@ class _OverviewBarChart extends StatelessWidget {
                 getTitlesWidget: (value, meta) {
                   return Text(
                     value.toInt().toString(),
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF8D99AE), fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF8D99AE),
+                      fontWeight: FontWeight.w500,
+                    ),
                   );
                 },
               ),
@@ -802,12 +1273,19 @@ class _OverviewBarChart extends StatelessWidget {
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (BarChartGroupData group) => const Color(0xFF1F2937),
+              getTooltipColor: (BarChartGroupData group) =>
+                  const Color(0xFF1F2937),
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final deptName = groupIndex < labels.length ? labels[groupIndex] : 'Department';
+                final deptName = groupIndex < labels.length
+                    ? labels[groupIndex]
+                    : 'Department';
                 return BarTooltipItem(
                   "$deptName\n${rod.toY.toInt()} issues",
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 );
               },
             ),
@@ -828,10 +1306,7 @@ class _OverviewBarChart extends StatelessWidget {
         children: [
           Icon(Icons.bar_chart, size: 48, color: Color(0xFF687280)),
           SizedBox(height: 8),
-          Text(
-            "No data available",
-            style: TextStyle(color: Color(0xFF687280)),
-          ),
+          Text("No data available", style: TextStyle(color: Color(0xFF687280))),
         ],
       ),
     );
@@ -846,7 +1321,10 @@ class _OverviewBarChart extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             "Error loading chart",
-            style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: Color(0xFFEF4444),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -854,7 +1332,7 @@ class _OverviewBarChart extends StatelessWidget {
   }
 }
 
-// ---------------- Resolution Trend Chart (Fixed) ----------------
+// Resolution Trend Chart Widget
 class _ResolutionTrendChart extends StatelessWidget {
   final List<dynamic> resolutionTrends;
   const _ResolutionTrendChart({required this.resolutionTrends});
@@ -923,10 +1401,8 @@ class _ResolutionTrendChart extends StatelessWidget {
               gridData: FlGridData(
                 show: true,
                 drawHorizontalLine: true,
-                getDrawingHorizontalLine: (value) => FlLine(
-                  color: Colors.grey.withOpacity(0.1),
-                  strokeWidth: 1,
-                ),
+                getDrawingHorizontalLine: (value) =>
+                    FlLine(color: Colors.grey.withOpacity(0.1), strokeWidth: 1),
               ),
               titlesData: FlTitlesData(
                 bottomTitles: AxisTitles(
@@ -934,8 +1410,12 @@ class _ResolutionTrendChart extends StatelessWidget {
                     showTitles: true,
                     reservedSize: 30,
                     getTitlesWidget: (value, meta) {
-                      final trend = resolutionTrends.isNotEmpty ? resolutionTrends[0] : null;
-                      final months = trend != null ? List<String>.from(trend['months']) : [];
+                      final trend = resolutionTrends.isNotEmpty
+                          ? resolutionTrends[0]
+                          : null;
+                      final months = trend != null
+                          ? List<String>.from(trend['months'])
+                          : [];
                       final index = value.toInt();
                       if (index >= 0 && index < months.length) {
                         return Text(
@@ -967,8 +1447,12 @@ class _ResolutionTrendChart extends StatelessWidget {
                     },
                   ),
                 ),
-                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
               borderData: FlBorderData(
                 show: true,
@@ -977,8 +1461,7 @@ class _ResolutionTrendChart extends StatelessWidget {
               lineBarsData: resolutionTrends.asMap().entries.map((entry) {
                 final index = entry.key;
                 final trend = entry.value;
-                
-                // FIX: Convert data to double safely
+
                 final rawData = trend['data'] as List;
                 final trendData = rawData.map((x) {
                   if (x is int) return x.toDouble();
@@ -987,7 +1470,7 @@ class _ResolutionTrendChart extends StatelessWidget {
                   if (x is String) return double.tryParse(x) ?? 0.0;
                   return 0.0;
                 }).toList();
-                
+
                 return LineChartBarData(
                   spots: trendData.asMap().entries.map((dataEntry) {
                     return FlSpot(dataEntry.key.toDouble(), dataEntry.value);
@@ -1010,7 +1493,7 @@ class _ResolutionTrendChart extends StatelessWidget {
   }
 }
 
-// ---------------- Department Detail Page (Enhanced) ----------------
+// Department Detail Page
 class DepartmentDetailPage extends StatefulWidget {
   final int deptId;
   final String name;
@@ -1061,13 +1544,14 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
 
   Future<void> _loadEfficiencyTrend() async {
     try {
-      final response = await apiService.getDepartmentEfficiencyTrend(widget.deptId);
+      final response = await apiService.getDepartmentEfficiencyTrend(
+        widget.deptId,
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final rawTrend = data['efficiency_trend'] as List;
-        
+
         setState(() {
-          // FIX: Convert to double safely
           efficiencyTrend = rawTrend.map((x) {
             if (x is int) return x.toDouble();
             if (x is double) return x;
@@ -1170,7 +1654,10 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     onPressed: () => _showFeedbackDialog(widget.name),
                     icon: const Icon(Icons.feedback_outlined, size: 18),
@@ -1182,14 +1669,29 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
 
             const SizedBox(height: 24),
 
-            // Stats Cards - FIX: Removed nested Expanded
+            // Stats Cards
             Row(
               children: [
-                _buildModernStatCard("Resolved", resolved, resolvedPct, const Color(0xFF4ADE80)),
+                _buildModernStatCard(
+                  "Resolved",
+                  resolved,
+                  resolvedPct,
+                  const Color(0xFF4ADE80),
+                ),
                 const SizedBox(width: 12),
-                _buildModernStatCard("Pending", pending, pendingPct, const Color(0xFFF59E0B)),
+                _buildModernStatCard(
+                  "Pending",
+                  pending,
+                  pendingPct,
+                  const Color(0xFFF59E0B),
+                ),
                 const SizedBox(width: 12),
-                _buildModernStatCard("In Progress", progress, progressPct, const Color(0xFF3B82F6)),
+                _buildModernStatCard(
+                  "In Progress",
+                  progress,
+                  progressPct,
+                  const Color(0xFF3B82F6),
+                ),
               ],
             ),
 
@@ -1213,10 +1715,7 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
                   const SizedBox(height: 8),
                   Text(
                     "Last 6 months performance",
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -1224,76 +1723,97 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : efficiencyTrend.isEmpty
-                            ? const Center(child: Text("No trend data available"))
-                            : LineChart(
-                                LineChartData(
-                                  gridData: FlGridData(
+                        ? const Center(child: Text("No trend data available"))
+                        : LineChart(
+                            LineChartData(
+                              gridData: FlGridData(
+                                show: true,
+                                drawHorizontalLine: true,
+                                getDrawingHorizontalLine: (value) => FlLine(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  strokeWidth: 1,
+                                ),
+                              ),
+                              titlesData: FlTitlesData(
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 30,
+                                    getTitlesWidget: (value, meta) {
+                                      final months = [
+                                        "Jan",
+                                        "Feb",
+                                        "Mar",
+                                        "Apr",
+                                        "May",
+                                        "Jun",
+                                      ];
+                                      final index = value.toInt();
+                                      if (index >= 0 &&
+                                          index < months.length &&
+                                          index < efficiencyTrend.length) {
+                                        return Text(
+                                          months[index],
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF8D99AE),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        );
+                                      }
+                                      return const Text("");
+                                    },
+                                  ),
+                                ),
+                                leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 36,
+                                    getTitlesWidget: (value, meta) {
+                                      return Text(
+                                        "${value.toInt()}%",
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF8D99AE),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                rightTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                                topTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                              ),
+                              borderData: FlBorderData(
+                                show: true,
+                                border: Border.all(
+                                  color: Colors.grey.withOpacity(0.1),
+                                ),
+                              ),
+                              minY: 50,
+                              maxY: 100,
+                              lineBarsData: [
+                                LineChartBarData(
+                                  spots: efficiencyTrend.asMap().entries.map((
+                                    entry,
+                                  ) {
+                                    return FlSpot(
+                                      entry.key.toDouble(),
+                                      entry.value,
+                                    );
+                                  }).toList(),
+                                  isCurved: true,
+                                  color: primaryColor,
+                                  barWidth: 4,
+                                  isStrokeCapRound: true,
+                                  dotData: FlDotData(
                                     show: true,
-                                    drawHorizontalLine: true,
-                                    getDrawingHorizontalLine: (value) => FlLine(
-                                      color: Colors.grey.withOpacity(0.1),
-                                      strokeWidth: 1,
-                                    ),
-                                  ),
-                                  titlesData: FlTitlesData(
-                                    bottomTitles: AxisTitles(
-                                      sideTitles: SideTitles(
-                                        showTitles: true,
-                                        reservedSize: 30,
-                                        getTitlesWidget: (value, meta) {
-                                          final months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-                                          final index = value.toInt();
-                                          if (index >= 0 && index < months.length && index < efficiencyTrend.length) {
-                                            return Text(
-                                              months[index],
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: Color(0xFF8D99AE),
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            );
-                                          }
-                                          return const Text("");
-                                        },
-                                      ),
-                                    ),
-                                    leftTitles: AxisTitles(
-                                      sideTitles: SideTitles(
-                                        showTitles: true,
-                                        reservedSize: 36,
-                                        getTitlesWidget: (value, meta) {
-                                          return Text(
-                                            "${value.toInt()}%",
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Color(0xFF8D99AE),
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                  ),
-                                  borderData: FlBorderData(
-                                    show: true,
-                                    border: Border.all(color: Colors.grey.withOpacity(0.1)),
-                                  ),
-                                  minY: 50,
-                                  maxY: 100,
-                                  lineBarsData: [
-                                    LineChartBarData(
-                                      spots: efficiencyTrend.asMap().entries.map((entry) {
-                                        return FlSpot(entry.key.toDouble(), entry.value);
-                                      }).toList(),
-                                      isCurved: true,
-                                      color: primaryColor,
-                                      barWidth: 4,
-                                      isStrokeCapRound: true,
-                                      dotData: FlDotData(
-                                        show: true,
-                                        getDotPainter: (spot, percent, barData, index) {
+                                    getDotPainter:
+                                        (spot, percent, barData, index) {
                                           return FlDotCirclePainter(
                                             radius: 4,
                                             color: primaryColor,
@@ -1301,22 +1821,22 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
                                             strokeColor: Colors.white,
                                           );
                                         },
-                                      ),
-                                      belowBarData: BarAreaData(
-                                        show: true,
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            primaryColor.withOpacity(0.3),
-                                            primaryColor.withOpacity(0.1),
-                                          ],
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                        ),
-                                      ),
+                                  ),
+                                  belowBarData: BarAreaData(
+                                    show: true,
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        primaryColor.withOpacity(0.3),
+                                        primaryColor.withOpacity(0.1),
+                                      ],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
+                              ],
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -1359,11 +1879,26 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _buildDetailLegend(const Color(0xFF4ADE80), "Resolved", resolved, resolvedPct),
+                              _buildDetailLegend(
+                                const Color(0xFF4ADE80),
+                                "Resolved",
+                                resolved,
+                                resolvedPct,
+                              ),
                               const SizedBox(height: 12),
-                              _buildDetailLegend(const Color(0xFFF59E0B), "Pending", pending, pendingPct),
+                              _buildDetailLegend(
+                                const Color(0xFFF59E0B),
+                                "Pending",
+                                pending,
+                                pendingPct,
+                              ),
                               const SizedBox(height: 12),
-                              _buildDetailLegend(const Color(0xFF3B82F6), "In Progress", progress, progressPct),
+                              _buildDetailLegend(
+                                const Color(0xFF3B82F6),
+                                "In Progress",
+                                progress,
+                                progressPct,
+                              ),
                             ],
                           ),
                         ),
@@ -1381,7 +1916,12 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
     );
   }
 
-  Widget _buildModernStatCard(String title, int value, double pct, Color color) {
+  Widget _buildModernStatCard(
+    String title,
+    int value,
+    double pct,
+    Color color,
+  ) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -1446,21 +1986,30 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
         color: const Color(0xFF4ADE80),
         radius: 40,
         title: "$resolved",
-        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       PieChartSectionData(
         value: pending.toDouble(),
         color: const Color(0xFFF59E0B),
         radius: 40,
         title: "$pending",
-        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       PieChartSectionData(
         value: progress.toDouble(),
         color: const Color(0xFF3B82F6),
         radius: 40,
         title: "$progress",
-        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     ];
   }
@@ -1536,7 +2085,10 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Color(0xFF8D99AE))),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Color(0xFF8D99AE)),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1566,7 +2118,9 @@ class _DepartmentDetailPageState extends State<DepartmentDetailPage> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF4361EE),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text("Submit"),
           ),

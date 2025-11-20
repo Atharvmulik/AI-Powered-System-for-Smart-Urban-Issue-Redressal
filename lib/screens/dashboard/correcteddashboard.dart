@@ -1,9 +1,9 @@
 import 'dart:math' as math;
-import 'dart:convert'; 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../guide/guide.dart';
 import '../report/issuereport.dart' as report;
-import '../../services/api_service.dart'; 
+import '../../services/api_service.dart';
 import '../../pages/user_profile.dart';
 import '../../pages/user_report_page.dart';
 import '../../pages/map_view.dart';
@@ -11,7 +11,7 @@ import '../../pages/map_view.dart';
 class DashboardScreen extends StatefulWidget {
   final String userEmail;
   final String userName;
-  
+
   const DashboardScreen({
     super.key,
     required this.userEmail,
@@ -49,7 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     overlay.insert(overlayEntry);
   }
-  
+
   @override
   void initState() {
     super.initState();
@@ -57,205 +57,213 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _loadIssues() async {
-  try {
-    print('🔄 Loading issues for user: ${widget.userEmail}');
-    final ApiService apiService = ApiService();
-    final response = await apiService.getUserReports(widget.userEmail, statusFilter: 'all');
-    
-    print('📡 Response status: ${response.statusCode}');
-    print('📦 Full response: ${response.body}'); // Add this to see the actual data
-    
-    if (mounted) {
-      setState(() {
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          reportedIssues = data['complaints'] ?? [];
-          print('✅ Successfully loaded ${reportedIssues.length} issues');
-          
-          // Debug: Print each issue to see the actual data structure
-          for (var i = 0; i < reportedIssues.length; i++) {
-            print('📝 Issue $i: ${reportedIssues[i]}');
+    try {
+      print('🔄 Loading issues for user: ${widget.userEmail}');
+      final ApiService apiService = ApiService();
+      final response = await apiService.getUserReports(
+        widget.userEmail,
+        statusFilter: 'all',
+      );
+
+      print('📡 Response status: ${response.statusCode}');
+      print(
+        '📦 Full response: ${response.body}',
+      ); // Add this to see the actual data
+
+      if (mounted) {
+        setState(() {
+          if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            reportedIssues = data['complaints'] ?? [];
+            print('✅ Successfully loaded ${reportedIssues.length} issues');
+
+            // Debug: Print each issue to see the actual data structure
+            for (var i = 0; i < reportedIssues.length; i++) {
+              print('📝 Issue $i: ${reportedIssues[i]}');
+            }
+          } else {
+            reportedIssues = [];
+            print('❌ Failed to load issues: ${response.statusCode}');
           }
-        } else {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading issues: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
           reportedIssues = [];
-          print('❌ Failed to load issues: ${response.statusCode}');
-        }
-        isLoading = false;
-      });
-    }
-  } catch (e) {
-    print('❌ Error loading issues: $e');
-    if (mounted) {
-      setState(() {
-        isLoading = false;
-        reportedIssues = [];
-      });
+        });
+      }
     }
   }
-}
+
   double _getUrgencyValue(String urgency) {
     switch (urgency.toLowerCase()) {
-      case 'high': return 0.9;
-      case 'medium': return 0.6;
-      case 'low': return 0.3;
-      default: return 0.5;
+      case 'high':
+        return 0.9;
+      case 'medium':
+        return 0.6;
+      case 'low':
+        return 0.3;
+      default:
+        return 0.5;
     }
   }
 
   @override
-Widget build(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
 
-  return Scaffold(
-    backgroundColor: Colors.white, // Changed background to white
-    appBar: AppBar(
-      backgroundColor: Colors.teal[800], // Changed to dark teal
-      title: Row(
-        children: [
-          const Icon(
-            Icons.radio_button_checked,
-            color: Colors.white, // Changed icon color to white for contrast
-            size: 22,
+    return Scaffold(
+      backgroundColor: Colors.white, // Changed background to white
+      appBar: AppBar(
+        backgroundColor: Colors.teal[800], // Changed to dark teal
+        title: Row(
+          children: [
+            const Icon(
+              Icons.radio_button_checked,
+              color: Colors.white, // Changed icon color to white for contrast
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'UrbanSim AI',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white, // Changed text color to white for contrast
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: _showGuideOverlay,
+            icon: const Icon(
+              Icons.help_outline,
+              color: Colors.white,
+            ), // White icon
           ),
-          const SizedBox(width: 8),
-          Text(
-            'UrbanSim AI',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white, // Changed text color to white for contrast
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: Colors.white,
+            ), // White icon
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        UserProfilePage(userEmail: widget.userEmail),
+                  ),
+                );
+              },
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.white,
+                child: Text(
+                  widget.userName.isNotEmpty
+                      ? widget.userName[0].toUpperCase()
+                      : 'U',
+                  style: TextStyle(
+                    color: Colors.teal[800],
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
-      actions: [
-        IconButton(
-          onPressed: _showGuideOverlay,
-          icon: const Icon(Icons.help_outline, color: Colors.white), // White icon
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _greetingCard(cs),
+            const SizedBox(height: 12),
+            _reportedSection(cs),
+            const SizedBox(height: 18),
+            _reportIssueSection(cs),
+            const SizedBox(height: 18),
+            _resolvedTodaySection(cs),
+            const SizedBox(height: 18),
+            _recentActivityList(),
+          ],
         ),
-        IconButton(
-          onPressed: () {
-            // Notifications logic here if needed
-          },
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white), // White icon
-        ),
-        // In your DashboardScreen app bar actions:
-        Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: GestureDetector(
-            // In _reportedSection method, update the onTap:
-            onTap: () {
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _bottomIndex,
+        onDestinationSelected: (index) {
+          // Handle navigation based on selected index
+          switch (index) {
+            case 0: // Home - already on dashboard
+              setState(() => _bottomIndex = index);
+              break;
+            case 1: // Report
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => UserReportsPage(
-                    userEmail: widget.userEmail,
-                    userName: widget.userName,
-                  ),
+                  builder: (_) => const report.ReportIssuePage(),
                 ),
               );
-            },
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.white, // Changed to white for contrast
-              child: Text(
-                widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                style: TextStyle(
-                  color: Colors.teal[800], // Changed text color to teal
-                  fontWeight: FontWeight.w700,
+              // Reset to home after navigation
+              Future.delayed(Duration.zero, () {
+                if (mounted) {
+                  setState(() => _bottomIndex = 0);
+                }
+              });
+              break;
+            case 2: // Profile
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UserProfilePage(userEmail: widget.userEmail),
                 ),
-              ),
-            ),
+              );
+              // Reset to home after navigation
+              Future.delayed(Duration.zero, () {
+                if (mounted) {
+                  setState(() => _bottomIndex = 0);
+                }
+              });
+              break;
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
-        ),
-      ],
-    ),
-    body: SingleChildScrollView( // Removed the Stack and _trackNearbyBar
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _greetingCard(cs),
-          const SizedBox(height: 12),
-          _reportedSection(cs),
-          const SizedBox(height: 18),
-          _reportIssueSection(cs),
-          const SizedBox(height: 18),
-          _resolvedTodaySection(cs),
-          const SizedBox(height: 18),
-          _recentActivityList(),
+          NavigationDestination(icon: Icon(Icons.add), label: 'Report'),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+          ),
         ],
       ),
-    ),
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: _bottomIndex,
-      onDestinationSelected: (index) {
-        // Handle navigation based on selected index
-        switch (index) {
-          case 0: // Home - already on dashboard
-            setState(() => _bottomIndex = index);
-            break;
-          case 1: // Report
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const report.ReportIssuePage(),
-              ),
-            );
-            // Reset to home after navigation
-            Future.delayed(Duration.zero, () {
-              if (mounted) {
-                setState(() => _bottomIndex = 0);
-              }
-            });
-            break;
-          case 2: // Profile
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => UserProfilePage(
-                  userEmail: widget.userEmail,
-                ),
-              ),
-            );
-            // Reset to home after navigation
-            Future.delayed(Duration.zero, () {
-              if (mounted) {
-                setState(() => _bottomIndex = 0);
-              }
-            });
-            break;
-        }
-      },
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: 'Home',
-        ),
-        NavigationDestination(icon: Icon(Icons.add), label: 'Report'),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          label: 'Profile',
-        ),
-      ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const report.ReportIssuePage(),
-          ),
-        );
-      },
-      backgroundColor: Colors.green,
-      foregroundColor: Colors.white,
-      icon: const Icon(Icons.add),
-      label: const Text('Report issue'),
-    ),
-    floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-  );
-}
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const report.ReportIssuePage()),
+          );
+        },
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Report issue'),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
 
   Widget _greetingCard(ColorScheme cs) {
     return Container(
@@ -289,17 +297,17 @@ Widget build(BuildContext context) {
                   spacing: 8,
                   children: [
                     // In _greetingCard method, update the Track chip:
-                  _quickChip('Track', Icons.location_on, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => UserReportsPage(
-                          userEmail: widget.userEmail,
-                          userName: widget.userName,
+                    _quickChip('Track', Icons.location_on, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserReportsPage(
+                            userEmail: widget.userEmail,
+                            userName: widget.userName,
+                          ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    }),
                     _quickChip('Nearby Issues', Icons.receipt_long, () {
                       Navigator.push(
                         context,
@@ -321,64 +329,63 @@ Widget build(BuildContext context) {
   }
 
   Widget _reportedSection(ColorScheme cs) {
-  if (isLoading) {
-    return const Center(child: CircularProgressIndicator());
-  }
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Reported issues',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadIssues,
-          ),
-        ],
-      ),
-      const SizedBox(height: 10),
-      SizedBox(
-        height: 180,
-        child: reportedIssues.isEmpty
-            ? const Center(child: Text('No issues reported yet'))
-            : ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: reportedIssues.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final issue = reportedIssues[index];
-                  return _IssueCard(
-                    data: IssueCardData(
-                      title: issue['title'] ?? 'No title',
-                      type: issue['category'] ?? 'General',
-                      urgency: _getUrgencyValue(issue['urgency_level'] ?? 'medium'), // Fixed field name
-                      distanceKm: 0.5,
-                    ),
-                    onTap: () {
-                      // ✅ CORRECTED: Navigate to UserReportsPage instead of TrackIssuePage
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => UserReportsPage(
-                            userEmail: widget.userEmail,
-                            userName: widget.userName,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Reported issues',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            IconButton(icon: const Icon(Icons.refresh), onPressed: _loadIssues),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 180,
+          child: reportedIssues.isEmpty
+              ? const Center(child: Text('No issues reported yet'))
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: reportedIssues.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final issue = reportedIssues[index];
+                    return _IssueCard(
+                      data: IssueCardData(
+                        title: issue['title'] ?? 'No title',
+                        type: issue['category'] ?? 'General',
+                        urgency: _getUrgencyValue(
+                          issue['urgency_level'] ?? 'medium',
+                        ), // Fixed field name
+                        distanceKm: 0.5,
+                      ),
+                      onTap: () {
+                        // ✅ CORRECTED: Navigate to UserReportsPage instead of TrackIssuePage
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UserReportsPage(
+                              userEmail: widget.userEmail,
+                              userName: widget.userName,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-      ),
-    ],
-  );
-}
+                        );
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
 
   Widget _reportIssueSection(ColorScheme cs) {
     return Column(
@@ -677,10 +684,7 @@ class _CategoryTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: Colors.teal.shade100,
-            border: Border.all(
-              color: Colors.blue.shade200,
-              width: 2,
-            ),
+            border: Border.all(color: Colors.blue.shade200, width: 2),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -797,18 +801,18 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DonutPainter oldDelegate) {
-    return oldDelegate.value != value || 
-           oldDelegate.bgColor != bgColor || 
-           oldDelegate.fgColor != fgColor;
+    return oldDelegate.value != value ||
+        oldDelegate.bgColor != bgColor ||
+        oldDelegate.fgColor != fgColor;
   }
 }
 
 // Placeholder classes for navigation (you'll need to implement these)
 class TrackIssuesPage extends StatelessWidget {
   final String userEmail;
-  
+
   const TrackIssuesPage({super.key, required this.userEmail});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

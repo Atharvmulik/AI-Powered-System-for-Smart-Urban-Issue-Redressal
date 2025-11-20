@@ -1,24 +1,35 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- LOCATION PERMISSIONS -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.CAMERA" />
     
-    <!-- For Android 10 and below -->
+    <!-- STORAGE PERMISSIONS -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
+    <!-- NETWORK PERMISSIONS -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- For Android 11+ -->
+    <!-- FOR ANDROID 11+ -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    
+    <!-- ADD THESE FOR BETTER LOCATION SUPPORT -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="civic_eye_admin"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
+        
+        <!-- ADD GOOGLE PLAY SERVICES FOR LOCATION -->
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
     
         <activity
             android:name=".MainActivity"

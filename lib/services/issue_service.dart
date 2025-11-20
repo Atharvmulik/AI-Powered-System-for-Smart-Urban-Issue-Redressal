@@ -5,52 +5,40 @@ class IssueService {
   final ApiService _apiService = ApiService();
 
   // ✅ CORRECTED: Submit report with urgency level - FIXED URL ISSUE
-  Future<Map<String, dynamic>> submitReport(Map<String, dynamic> reportData) async {
-    try {
-      print('🚀 IssueService: Submitting report with data: $reportData');
-      
-      final response = await _apiService.createReport({
-        // User Information
-        'user_name': reportData['user_name'],
-        'user_mobile': reportData['user_mobile'],
-        'user_email': reportData['user_email'],
-        
-        // ✅ CORRECT: urgency_level instead of issue_type
-        'urgency_level': reportData['urgency_level'],
-        'title': reportData['title'],
-        'description': reportData['description'],
-        
-        // Location Information
-        'location_lat': reportData['location_lat'],
-        'location_long': reportData['location_long'],
-        'location_address': reportData['location_address'],
-      });
+  Future<Map<String, dynamic>> submitReport(Map<String, dynamic> reportData, {String? imagePath}) async {
+  try {
+    print('🚀 IssueService: Submitting report with AI department prediction');
+    
+    final response = await _apiService.createReportWithAutoDepartment(
+      reportData,
+      imagePath: imagePath,
+    );
 
-      print('📡 IssueService: Response Status: ${response.statusCode}');
-      print('📄 IssueService: Response Body: ${response.body}');
+    print('📡 IssueService: Response Status: ${response.statusCode}');
+    print('📄 IssueService: Response Body: ${response.body}');
 
-      if (ApiService.isSuccess(response)) {
-        final data = ApiService.parseResponse(response);
-        return {'success': true, 'data': data};
-      } else {
-        // Handle redirect (307 status code)
-        if (response.statusCode == 307) {
-          print('🔄 IssueService: Redirect detected, handling...');
-          return {'success': false, 'error': 'Redirect issue - please check backend URL'};
-        }
-        
-        try {
-          final error = json.decode(response.body);
-          return {'success': false, 'error': error['detail'] ?? 'Failed to submit report'};
-        } catch (e) {
-          return {'success': false, 'error': 'HTTP ${response.statusCode}: ${response.body}'};
-        }
+    if (ApiService.isSuccess(response)) {
+      final data = ApiService.parseResponse(response);
+      return {'success': true, 'data': data};
+    } else {
+      // Handle redirect (307 status code)
+      if (response.statusCode == 307) {
+        print('🔄 IssueService: Redirect detected, handling...');
+        return {'success': false, 'error': 'Redirect issue - please check backend URL'};
       }
-    } catch (e) {
-      print('💥 IssueService: Error: $e');
-      return {'success': false, 'error': e.toString()};
+      
+      try {
+        final error = json.decode(response.body);
+        return {'success': false, 'error': error['detail'] ?? 'Failed to submit report'};
+      } catch (e) {
+        return {'success': false, 'error': 'HTTP ${response.statusCode}: ${response.body}'};
+      }
     }
+  } catch (e) {
+    print('💥 IssueService: Error: $e');
+    return {'success': false, 'error': e.toString()};
   }
+}
 
   // ✅ CORRECTED: Get urgency levels from backend
   Future<Map<String, dynamic>> getUrgencyLevels() async {

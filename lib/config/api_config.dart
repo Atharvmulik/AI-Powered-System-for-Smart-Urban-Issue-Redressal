@@ -218,4 +218,23 @@ class ApiConfig {
     return '$baseUrl$adminCategoryBreakdown';
   
   }
+
+  // ==================== AI PREDICTION ENDPOINTS ====================
+  static String get predictDepartment => "/predict-department";
+  static String get predictTextOnly => "/predict-text-only";
+  static String get predictImage => "/predict-image";
+  
+  // Helper methods for AI endpoints
+  static String buildPredictDepartmentUrl() {
+    return '$baseUrl$predictDepartment';
+  }
+  
+  static String buildPredictTextOnlyUrl() {
+    return '$baseUrl$predictTextOnly';
+  }
+  
+  static String buildPredictImageUrl() {
+    return '$baseUrl$predictImage';
+  }
+
 }

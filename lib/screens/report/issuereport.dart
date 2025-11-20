@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '/services/issue_service.dart'; 
 import '/services/location_service.dart'; 
 import 'dart:async'; 
 import 'dart:io';
+import 'dart:convert';
+import '../../services/api_service.dart';
 
 const _indigo = Colors.indigo;
 const _green = Colors.green;
@@ -42,7 +43,6 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
   bool _isUploadingImage = false;
 
   // Service instance
-  final IssueService _issueService = IssueService();
   final ImagePicker _imagePicker = ImagePicker();
 
   // color tokens
@@ -56,6 +56,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     _email.dispose();
     _manualLocation.dispose();
     _textDescription.dispose();
+    _citySearchController.dispose(); 
     super.dispose();
   }
 
@@ -70,78 +71,155 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
   // ====== LOCATION FUNCTIONALITY ======
   Future<void> _getCurrentLocation() async {
-    if (!mounted) return;
+  if (!mounted) return;
+  
+  setState(() {
+    _isLoadingLocation = true;
+    _locationError = '';
+  });
+
+  try {
+    print('🔄 Starting location request...');
     
+    // Try quick location first
+    LocationResult result = await LocationService.getQuickLocation();
+
+    if (!mounted) return;
+
+    if (result.success) {
+      print('✅ Location captured: ${result.latitude}, ${result.longitude}');
+      
+      // Get better address using OpenWeather
+      LocationResult addressResult = await OpenWeatherLocationService.getLocationByCoords(
+        result.latitude!, 
+        result.longitude!
+      );
+
+      setState(() {
+        _currentLat = result.latitude;
+        _currentLong = result.longitude;
+        _currentAddress = addressResult.success 
+            ? addressResult.address 
+            : "Location: ${result.latitude!.toStringAsFixed(4)}, ${result.longitude!.toStringAsFixed(4)}";
+        _locationChoice = '📍 Current location';
+        _isLoadingLocation = false;
+        _locationError = '';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📍 Location captured successfully!'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      print('❌ Location failed: ${result.error}');
+      setState(() {
+        _isLoadingLocation = false;
+        _locationError = result.error ?? 'Failed to get location';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Location error: ${result.error}'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Settings',
+            onPressed: () => LocationService.openAppSettings(),
+          ),
+        ),
+      );
+    }
+
+  } catch (e) {
+    print('💥 Unexpected error in _getCurrentLocation: $e');
+    if (mounted) {
+      setState(() {
+        _isLoadingLocation = false;
+        _locationError = 'Unexpected error: $e';
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+}
+
+  // Add these controllers and variables
+  TextEditingController _citySearchController = TextEditingController();
+  bool _isSearchingCity = false;
+
+  // Add this method for city search
+  void _showCitySearchDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Search City'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _citySearchController,
+              decoration: InputDecoration(
+                hintText: 'Enter city name (e.g., Mumbai, Delhi)...',
+                suffixIcon: Icon(Icons.search),
+              ),
+            ),
+            SizedBox(height: 10),
+            if (_isSearchingCity) CircularProgressIndicator(),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _searchCityLocation,
+            child: Text('Search'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _searchCityLocation() async {
+    if (_citySearchController.text.isEmpty) return;
+
     setState(() {
-      _isLoadingLocation = true;
-      _locationError = '';
+      _isSearchingCity = true;
     });
 
-    try {
-      print('🔄 Starting location request...');
-      
-      // First check if we have basic permissions
-      bool hasPermission = await LocationService.hasLocationPermission();
-      if (!hasPermission) {
-        print('⚠️ No location permission, requesting...');
-      }
+    final result = await OpenWeatherLocationService.getLocationByCity(
+      _citySearchController.text,
+    );
 
-      LocationResult result = await LocationService.getCurrentLocation();
+    if (!mounted) return;
 
-      if (!mounted) return;
+    setState(() {
+      _isSearchingCity = false;
+    });
 
-      if (result.success) {
-        print('✅ Location captured: ${result.latitude}, ${result.longitude}');
-        setState(() {
-          _currentLat = result.latitude;
-          _currentLong = result.longitude;
-          _currentAddress = result.address ?? "Location captured";
-          _locationChoice = '📍 Current location';
-          _isLoadingLocation = false;
-          _locationError = '';
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('📍 Location captured successfully!'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        print('❌ Location failed: ${result.error}');
-        setState(() {
-          _isLoadingLocation = false;
-          _locationError = result.error ?? 'Failed to get location';
-        });
-
-        // Show error to user
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Location error: ${result.error}'),
-            duration: const Duration(seconds: 3),
-            action: SnackBarAction(
-              label: 'Settings',
-              onPressed: () => LocationService.openAppSettings(),
-            ),
-          ),
-        );
-      }
-
-    } catch (e) {
-      print('💥 Unexpected error in _getCurrentLocation: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-          _locationError = 'Unexpected error: $e';
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+    if (result.success) {
+      setState(() {
+        _currentLat = result.latitude;
+        _currentLong = result.longitude;
+        _currentAddress = result.address ?? "Location found";
+        _locationChoice = '📍 ${_citySearchController.text}';
+        _locationError = '';
+      });
+      Navigator.pop(context); // Close dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('📍 Location found: ${result.address}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ ${result.error}')),
+      );
     }
   }
 
@@ -240,11 +318,15 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
   void _showLocationMenu() {
     _showChoiceSheet('Location', [
-      '📍 Current location',
+      '📍 Current location (GPS)',
+      '🔍 Search by city name',
       '✏️ Enter manually',
     ], (c) async {
       if (c.contains('Current')) {
         await _getCurrentLocation();
+      } else if (c.contains('Search')) {
+        _citySearchController.clear();
+        _showCitySearchDialog();
       } else if (c.contains('manually')) {
         setState(() {
           _locationChoice = '✏️ Manual location';
@@ -255,104 +337,124 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     });
   }
 
-  void _handleSubmit() async {
-    if (!_validateRequired()) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please fill all required fields.')));
-      return;
-    }
+  // ✅ FIXED: _handleSubmit method in issuereport.dart
 
-    // Validate location based on choice
-    if (_locationChoice == '📍 Current location' && (_currentLat == null || _currentLong == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please wait for location to be captured or select another location option.')),
-      );
-      return;
-    }
-
-    if (_locationChoice == '✏️ Manual location' && _manualLocation.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter manual location details.')),
-      );
-      return;
-    }
-
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
-      String locationAddress;
-      double latitude;
-      double longitude;
-      
-      if (_locationChoice == '📍 Current location' && _currentLat != null && _currentLong != null) {
-        locationAddress = _currentAddress ?? "Current Location (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})";
-        latitude = _currentLat!;
-        longitude = _currentLong!;
-      } else if (_locationChoice == '✏️ Manual location' && _manualLocation.text.isNotEmpty) {
-        locationAddress = _manualLocation.text;
-        latitude = 0.0;
-        longitude = 0.0;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please provide a valid location.')),
-        );
-        if (mounted) Navigator.pop(context);
-        return;
-      }
-
-      // Prepare report data
-      Map<String, dynamic> reportData = {
-        'user_name': _name.text,
-        'user_mobile': _phone.text,
-        'user_email': _email.text.isEmpty ? null : _email.text,
-        'urgency_level': _urgencyLevel,
-        'title': _textDescription.text.split(' ').take(5).join(' '),
-        'description': _textDescription.text,
-        'location_lat': latitude,
-        'location_long': longitude,
-        'location_address': locationAddress,
-      };
-
-      final response = await _issueService.submitReport(reportData);
-
-      if (mounted) Navigator.pop(context);
-
-      if (response['success']) {
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => ConfirmationPage(payload: {
-                'urgency': _urgencyLevel,
-                'location': locationAddress,
-                'description': _textDescription.text,
-                'hasImage': _selectedImage != null,
-              }),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to submit issue: ${response['error']}')),
-          );
-        }
-      }
-      
-    } catch (e) {
-      if (mounted) Navigator.pop(context);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit issue: $e')),
-        );
-      }
-    }
+void _handleSubmit() async {
+  if (!_validateRequired()) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Please fill all required fields.')));
+    return;
   }
 
+  // Validate location
+  bool hasCoordinates = _currentLat != null && _currentLong != null;
+  bool hasManualLocation = _showManualLocation && _manualLocation.text.isNotEmpty;
+
+  if (!hasCoordinates && !hasManualLocation) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please provide a location (GPS, city search, or manual entry).')),
+    );
+    return;
+  }
+
+  try {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Prepare location data
+    String locationAddress;
+    double latitude;
+    double longitude;
+    
+    if (hasCoordinates) {
+      locationAddress = _currentAddress ?? "Location (${_currentLat!.toStringAsFixed(6)}, ${_currentLong!.toStringAsFixed(6)})";
+      latitude = _currentLat!;
+      longitude = _currentLong!;
+    } else {
+      locationAddress = _manualLocation.text;
+      latitude = 0.0;
+      longitude = 0.0;
+    }
+
+    // ✅ FIXED: Create report data WITHOUT department field
+    // The API service will handle AI prediction and add it
+    Map<String, dynamic> reportData = {
+      'user_name': _name.text,
+      'user_mobile': _phone.text,
+      'user_email': _email.text.isEmpty ? null : _email.text,
+      'urgency_level': _urgencyLevel,
+      'title': _textDescription.text.split(' ').take(5).join(' '),
+      'description': _textDescription.text,
+      'location_lat': latitude,
+      'location_long': longitude,
+      'location_address': locationAddress,
+      // ❌ REMOVED: 'category': 'Infrastructure' - Let backend handle this
+      // ❌ DON'T add 'department' here - AI will predict it
+    };
+
+    print('📤 Submitting report data: $reportData');
+    print('🖼️ Image path: ${_selectedImage?.path ?? "No image"}');
+
+    // ✅ This method will:
+    // 1. Call AI prediction API
+    // 2. Add department, auto_assigned, prediction_confidence to reportData
+    // 3. Submit enhanced report to backend
+    final ApiService apiService = ApiService();
+    final response = await apiService.createReportWithAutoDepartment(
+      reportData,
+      imagePath: _selectedImage?.path,
+    );
+
+    if (mounted) Navigator.pop(context); // Close loading dialog
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final responseData = json.decode(response.body);
+      
+      print('✅ Report created successfully: $responseData');
+      
+      // ✅ Extract AI assignment info from response
+      final assignedDept = responseData['department'] ?? 'other';
+      final isAutoAssigned = responseData['auto_assigned'] ?? false;
+      final confidence = responseData['prediction_confidence'] ?? 0.0;
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ConfirmationPage(payload: {
+              'urgency': _urgencyLevel,
+              'location': locationAddress,
+              'description': _textDescription.text,
+              'hasImage': _selectedImage != null,
+              'assignedDepartment': assignedDept,
+              'isAutoAssigned': isAutoAssigned,
+              'confidence': confidence,
+            }),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit issue: ${response.body}')),
+        );
+      }
+    }
+    
+  } catch (e) {
+    print('❌ Submit error: $e');
+    if (mounted) Navigator.pop(context);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit issue: $e')),
+      );
+    }
+  }
+}
   Color _getUrgencyColor() {
     switch (_urgencyLevel) {
       case 'High': return _red;
@@ -791,6 +893,9 @@ class ConfirmationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final assignedDept = payload['assignedDepartment'] ?? 'Not assigned';
+    final isAutoAssigned = payload['isAutoAssigned'] ?? false;
+    final confidence = payload['confidence'] ?? 0.0;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Report Submitted')),
@@ -812,6 +917,52 @@ class ConfirmationPage extends StatelessWidget {
                 _kv('Urgency', payload['urgency'] ?? '—'),
                 if (payload['location'] != null) _kv('Location', payload['location']),
                 if (payload['description'] != null) _kv('Description', payload['description']),
+                
+                // ADD AI ASSIGNMENT INFO
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isAutoAssigned ? Colors.green.shade50 : Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isAutoAssigned ? Colors.green.shade200 : Colors.blue.shade200,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isAutoAssigned ? Icons.auto_awesome : Icons.engineering,
+                        color: isAutoAssigned ? Colors.green : Colors.blue,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isAutoAssigned ? 'Auto-assigned to $assignedDept' : 'Assigned to $assignedDept',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: isAutoAssigned ? Colors.green.shade800 : Colors.blue.shade800,
+                              ),
+                            ),
+                            if (isAutoAssigned && confidence > 0)
+                              Text(
+                                'AI Confidence: ${confidence.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isAutoAssigned ? Colors.green.shade600 : Colors.blue.shade600,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
                 const SizedBox(height: 10),
                 if (payload['hasImage'] == true) 
                   _Badge(text: 'Photo attached', icon: Icons.photo),
