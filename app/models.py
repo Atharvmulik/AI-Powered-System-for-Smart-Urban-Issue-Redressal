@@ -1,7 +1,8 @@
 from app.database import Base
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship,Mapped, mapped_column
 from datetime import datetime
+from typing import Optional
 
 class User(Base):
     __tablename__ = "users"
@@ -101,6 +102,9 @@ class Report(Base):
     
     # Relationships
     user = relationship("User", back_populates="reports")
+    department: Mapped[str] = mapped_column(String, default="other")
+    auto_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
+    prediction_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
 # ========== DEPARTMENT ANALYSIS MODELS ==========
 

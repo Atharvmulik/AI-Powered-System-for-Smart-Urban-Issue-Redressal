@@ -17,21 +17,38 @@ async def fix_database():
         # Connect directly using asyncpg
         conn = await asyncpg.connect(database_url)
         
-        print("🔄 Adding category_id and status_id columns to reports table...")
+        print("🔄 Adding AI Department Assignment columns to reports table...")
         
-        # Add ONLY the two new columns
+        # Add the 3 CRITICAL columns for AI department assignment
         await conn.execute("""
             ALTER TABLE reports 
-            ADD COLUMN IF NOT EXISTS category_id INTEGER,
-            ADD COLUMN IF NOT EXISTS status_id INTEGER;
+            ADD COLUMN IF NOT EXISTS department VARCHAR DEFAULT 'other',
+            ADD COLUMN IF NOT EXISTS auto_assigned BOOLEAN DEFAULT false,
+            ADD COLUMN IF NOT EXISTS prediction_confidence FLOAT;
         """)
         
-        print("✅ category_id and status_id columns added successfully!")
+        print("✅ AI Department Assignment columns added successfully!")
         print("📊 Columns added:")
-        print("   - category_id (INTEGER)")
-        print("   - status_id (INTEGER)")
+        print("   - department (VARCHAR) - Default: 'other'")
+        print("   - auto_assigned (BOOLEAN) - Default: false") 
+        print("   - prediction_confidence (FLOAT) - AI confidence score")
+        
+        # Optional: Verify the columns were added
+        columns = await conn.fetch("""
+            SELECT column_name, data_type, column_default, is_nullable
+            FROM information_schema.columns 
+            WHERE table_name = 'reports' 
+            AND column_name IN ('department', 'auto_assigned', 'prediction_confidence');
+        """)
+        
+        print("\n📋 Verification - Added columns:")
+        for col in columns:
+            print(f"   - {col['column_name']}: {col['data_type']} (Default: {col['column_default']})")
         
         await conn.close()
+        
+        print("\n🎯 Database is now ready for AI Department Assignment!")
+        print("🚀 You can now submit reports with automatic department assignment!")
         
     except Exception as e:
         print(f"❌ Error: {e}")

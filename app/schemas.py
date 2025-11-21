@@ -86,6 +86,9 @@ class ReportCreate(BaseModel):
     location_lat: float
     location_long: float
     location_address: Optional[str] = None
+    department: Optional[str] = "other"
+    auto_assigned: Optional[bool] = False
+    prediction_confidence: Optional[float] = None
     
     @validator('user_name')
     def validate_user_name(cls, v):

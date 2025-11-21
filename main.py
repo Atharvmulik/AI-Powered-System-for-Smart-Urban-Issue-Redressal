@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Form,Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_, func
@@ -13,12 +13,17 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 import math
 from sqlalchemy.orm import selectinload
-
+import asyncio
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app import models, schemas, database
 from sqlalchemy.future import select
+
+from train_text_classifier import department_mapping
+import numpy as np
+from image_predict import original_class_labels,model
+from predict_text import predict_department_from_text
 
 from app import models
 from app.database import get_db, engine, AsyncSessionLocal
@@ -27,6 +32,9 @@ from app.schemas import UserCreate, UserResponse, UserLogin,MapStatsResponse,Map
 from app.auth_utils import get_password_hash, verify_password, create_access_token, SECRET_KEY, ALGORITHM    
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+from predict_text import predict_department_from_text
+from image_predict import predict_image, preprocess_image
 
 class UserCreateEnhanced(BaseModel):
     email: EmailStr
@@ -62,7 +70,6 @@ class UserLoginEnhanced(BaseModel):
     password: str
     is_admin: bool = False
 
-# ✅ UPDATED: Report Creation Schema with Urgency Level
 class ReportCreate(BaseModel):
     # User Information
     user_name: str
@@ -70,7 +77,7 @@ class ReportCreate(BaseModel):
     user_email: Optional[str] = None
     
     # Issue Information
-    urgency_level: str  # ✅ CHANGED: issue_type → urgency_level
+    urgency_level: str
     title: str
     description: str
     
@@ -78,6 +85,11 @@ class ReportCreate(BaseModel):
     location_lat: float
     location_long: float
     location_address: Optional[str] = None
+    
+    # ✅ ADD THESE FIELDS FOR AI ASSIGNMENT
+    department: Optional[str] = "other"  # Will be set by AI prediction
+    auto_assigned: Optional[bool] = False
+    prediction_confidence: Optional[float] = None
     
     # Validation
     @validator('user_name')
@@ -128,6 +140,13 @@ class ReportCreate(BaseModel):
         if not -180 <= v <= 180:
             raise ValueError('Longitude must be between -180 and 180')
         return v
+
+    @validator('department')
+    def validate_department(cls, v):
+        valid_depts = ["water_dept", "road_dept", "sanitation_dept", "electricity_dept", "other"]
+        if v and v not in valid_depts:
+            raise ValueError(f'Department must be one of: {", ".join(valid_depts)}')
+        return v if v else "other"
 
 app = FastAPI(title="Smart Urban Issue Redressal API", version="0.1.0")
 
@@ -259,7 +278,7 @@ async def create_report(
                 detail="Location coordinates are required"
             )
 
-        # Create report with default values for required database columns
+        # ✅ FIXED: Use report_data attributes directly (it's a Pydantic model)
         db_report = Report(
             user_name=report_data.user_name,
             user_mobile=report_data.user_mobile,
@@ -267,13 +286,15 @@ async def create_report(
             urgency_level=report_data.urgency_level,
             title=report_data.title,
             description=report_data.description,
-            # ✅ Provide defaults for database-required columns
-            issue_type="General",  # Default value for database
-            category="General",    # Default value for database
+            issue_type="General",
+            category="General",
             location_lat=report_data.location_lat,
             location_long=report_data.location_long,
             location_address=report_data.location_address,
-            status="Pending"
+            status="Pending",
+            department=report_data.department or "other",
+            auto_assigned=report_data.auto_assigned or False,
+            prediction_confidence=report_data.prediction_confidence
         )
 
         db.add(db_report)
@@ -284,7 +305,10 @@ async def create_report(
             "message": "Report created successfully!",
             "report_id": db_report.id,
             "urgency_level": report_data.urgency_level,
-            "location_provided": True
+            "location_provided": True,
+            "department": db_report.department,
+            "auto_assigned": db_report.auto_assigned,
+            "prediction_confidence": db_report.prediction_confidence
         }
         
     except HTTPException:
@@ -1283,8 +1307,6 @@ async def get_departments():
 
 # Department Analysis Endpoints
 
-# Helper functions (put these outside the endpoint functions, at the top level of your file)
-
 def get_department_icon(dept_name: str) -> str:
     icon_mapping = {
         "Water Dept": "water_drop",
@@ -1343,67 +1365,67 @@ class ResolveIssuesRequest(BaseModel):
     resolution_notes: str
 
 
-# 1. Get All Departments Summary - CORRECTED VERSION
-# 1. Get All Departments Summary - FIXED VERSION
+
 @app.get("/api/departments/summary")
 async def get_departments_summary(
     period: str = Query("month", description="Time period: week, month, year"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get summary for all departments with total issues, resolved, pending, progress counts
+    Get summary for all departments with REAL DATA from database
     """
     try:
-        # Get category to department mapping
-        department_mapping = {
-            "Infrastructure": "Road Dept",
-            "Sanitation": "Sanitation Dept", 
-            "Public Safety": "Public Works",
-            "Utilities": "Water Dept",
-            "Environment": "Electricity Dept"
+        # ✅ FIXED: Use actual department field from Report model
+        # Map database department values to display names
+        department_display_names = {
+            "water_dept": "Water Dept",
+            "road_dept": "Road Dept",
+            "sanitation_dept": "Sanitation Dept",
+            "electricity_dept": "Electricity Dept",
+            "other": "Other"
         }
         
         departments_data = []
         
-        # Get data for each department category
-        for category_name, dept_name in department_mapping.items():
-            # Get total issues for this category
+        # Query each department's real data
+        for dept_key, dept_name in department_display_names.items():
+            # Get total issues for this department
             total_result = await db.execute(
                 select(func.count(Report.id))
-                .select_from(Report)
-                .join(Category, Report.category_id == Category.id)
-                .where(Category.name == category_name)
+                .where(Report.department == dept_key)
             )
             total_issues = total_result.scalar() or 0
             
-            # Get status counts
+            # Get status counts for this department
             status_result = await db.execute(
-                select(Status.name, func.count(Report.id))
-                .select_from(Report)
-                .join(Category, Report.category_id == Category.id)
-                .join(Status, Report.status_id == Status.id)
-                .where(Category.name == category_name)
-                .group_by(Status.name)
+                select(Report.status, func.count(Report.id))
+                .where(Report.department == dept_key)
+                .group_by(Report.status)
             )
             status_counts = dict(status_result.all())
             
             resolved = status_counts.get("Resolved", 0)
-            pending = status_counts.get("Reported", 0)
+            pending = status_counts.get("Pending", 0)
             progress = status_counts.get("In Progress", 0)
             
+            # Calculate efficiency
             efficiency = round((resolved / total_issues * 100) if total_issues > 0 else 0, 1)
             
-            departments_data.append({
-                "id": len(departments_data) + 1,
-                "name": dept_name,
-                "icon": get_department_icon(dept_name),
-                "resolved": resolved,
-                "pending": pending,
-                "progress": progress,
-                "efficiency": efficiency,
-                "total_issues": total_issues,
-                "resolution_trend": generate_trend_data(efficiency)
-            })
+            # Only add departments that have issues
+            if total_issues > 0:
+                departments_data.append({
+                    "id": len(departments_data) + 1,
+                    "name": dept_name,
+                    "icon": get_department_icon(dept_name),
+                    "resolved": resolved,
+                    "pending": pending,
+                    "progress": progress,
+                    "efficiency": efficiency,
+                    "total_issues": total_issues,
+                    "resolution_trend": generate_trend_data(efficiency)
+                })
+        
+        print(f"✅ Fetched real data for {len(departments_data)} departments")
         
         return {
             "departments": departments_data,
@@ -1412,54 +1434,69 @@ async def get_departments_summary(
         }
         
     except Exception as e:
+        print(f"❌ Error fetching department summary: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching department summary: {str(e)}"
         )
     
-# 4. Get Resolution Trend Analysis - FIXED PARAMETER
 @app.get("/api/departments/resolution-trends")
 async def get_resolution_trends(
-    period: str = Query("month", description="Time period: week, month, year")
-    # REMOVED: db: AsyncSession = Depends(get_db) - not needed for static data
+    period: str = Query("month", description="Time period: week, month, year"),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Get resolution efficiency trends for all departments over time
+    Get REAL resolution trends from database
     """
     try:
-        # For demo purposes - return static data
-        trends = [
-            {
-                "department": "Water Dept",
-                "data": [65.0, 72.0, 78.0, 82.0, 85.0, 85.2],
-                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-            },
-            {
-                "department": "Road Dept", 
-                "data": [70.0, 75.0, 80.0, 85.0, 90.0, 92.5],
-                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-            },
-            {
-                "department": "Sanitation Dept",
-                "data": [60.0, 62.0, 65.0, 68.0, 70.0, 72.8],
-                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-            },
-            {
-                "department": "Electricity Dept",
-                "data": [75.0, 78.0, 80.0, 83.0, 86.0, 88.3],
-                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-            }
-        ]
+        department_display_names = {
+            "water_dept": "Water Dept",
+            "road_dept": "Road Dept",
+            "sanitation_dept": "Sanitation Dept",
+            "electricity_dept": "Electricity Dept"
+        }
+        
+        trends = []
+        
+        for dept_key, dept_name in department_display_names.items():
+            # Get total and resolved counts
+            total_result = await db.execute(
+                select(func.count(Report.id))
+                .where(Report.department == dept_key)
+            )
+            total = total_result.scalar() or 0
+            
+            resolved_result = await db.execute(
+                select(func.count(Report.id))
+                .where(Report.department == dept_key)
+                .where(Report.status == "Resolved")
+            )
+            resolved = resolved_result.scalar() or 0
+            
+            # Calculate current efficiency
+            current_efficiency = (resolved / total * 100) if total > 0 else 0
+            
+            # Generate realistic trend based on current efficiency
+            trend_data = generate_trend_data(current_efficiency)
+            
+            if total > 0:  # Only include departments with data
+                trends.append({
+                    "department": dept_name,
+                    "data": trend_data,
+                    "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+                })
+        
+        print(f"✅ Resolution trends: {len(trends)} departments")
         
         return {"trends": trends}
         
     except Exception as e:
+        print(f"❌ Error fetching resolution trends: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching resolution trends: {str(e)}"
-        )    
+        )   
 
-# 2. Get Department Details - CORRECTED VERSION
 @app.get("/api/departments/{dept_id}")
 async def get_department_details(
     dept_id: int,
@@ -1467,57 +1504,51 @@ async def get_department_details(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get detailed information for a specific department
+    Get REAL detailed information for a specific department
     """
     try:
-        # Get department mapping
-        department_names = {
-            1: "Water Dept",
-            2: "Road Dept", 
-            3: "Sanitation Dept",
-            4: "Electricity Dept",
-            5: "Public Works"
+        # Map department IDs to database keys
+        id_to_dept = {
+            1: ("water_dept", "Water Dept"),
+            2: ("road_dept", "Road Dept"),
+            3: ("sanitation_dept", "Sanitation Dept"),
+            4: ("electricity_dept", "Electricity Dept"),
+            5: ("other", "Other")
         }
         
-        if dept_id not in department_names:
+        if dept_id not in id_to_dept:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Department not found"
             )
         
-        dept_name = department_names[dept_id]
-        category_name = get_category_from_department(dept_name)  # ✅ FIXED: removed self.
+        dept_key, dept_name = id_to_dept[dept_id]
         
-        # Get real statistics for this department/category
-        stats_result = await db.execute(
-            select(
-                Status.name,
-                func.count(Report.id)
-            )
-            .select_from(Report)
-            .join(Category)
-            .join(Status)
-            .filter(Category.name == category_name)
-            .group_by(Status.name)
+        # Get REAL statistics from database
+        status_result = await db.execute(
+            select(Report.status, func.count(Report.id))
+            .where(Report.department == dept_key)
+            .group_by(Report.status)
         )
-        status_counts = dict(stats_result.all())
+        status_counts = dict(status_result.all())
         
         resolved = status_counts.get("Resolved", 0)
-        pending = status_counts.get("Reported", 0) 
+        pending = status_counts.get("Pending", 0)
         progress = status_counts.get("In Progress", 0)
         total_issues = resolved + pending + progress
+        
         efficiency = round((resolved / total_issues * 100) if total_issues > 0 else 0, 1)
         
         return {
             "id": dept_id,
             "name": dept_name,
-            "icon": get_department_icon(dept_name),  # ✅ FIXED: removed self.
+            "icon": get_department_icon(dept_name),
             "resolved": resolved,
             "pending": pending,
             "progress": progress,
             "efficiency": efficiency,
             "total_issues": total_issues,
-            "efficiency_trend": generate_efficiency_trend(dept_id),  # ✅ FIXED: removed self.
+            "efficiency_trend": generate_efficiency_trend(dept_id),
             "breakdown": {
                 "resolved_percentage": round((resolved / total_issues * 100) if total_issues > 0 else 0, 1),
                 "pending_percentage": round((pending / total_issues * 100) if total_issues > 0 else 0, 1),
@@ -1541,34 +1572,35 @@ async def get_issues_by_department(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get total issues count per department for bar chart
+    Get REAL issues count per department for bar chart
     """
     try:
-        # Map categories to department names
-        department_mapping = {
-            "Infrastructure": "Road Dept",
-            "Sanitation": "Sanitation Dept",
-            "Public Safety": "Public Works", 
-            "Utilities": "Water Dept",
-            "Environment": "Electricity Dept"
+        department_display_names = {
+            "water_dept": "Water Dept",
+            "road_dept": "Road Dept",
+            "sanitation_dept": "Sanitation Dept",
+            "electricity_dept": "Electricity Dept",
+            "other": "Other"
         }
         
         data = []
         
-        for category_name, dept_name in department_mapping.items():
-            # Get count for this category
+        for dept_key, dept_name in department_display_names.items():
+            # Get real count from database
             count_result = await db.execute(
                 select(func.count(Report.id))
-                .select_from(Report)
-                .join(Category, Report.category_id == Category.id)
-                .where(Category.name == category_name)
+                .where(Report.department == dept_key)
             )
             count = count_result.scalar() or 0
             
-            data.append({
-                "department": dept_name,
-                "issues_count": float(count)  # Convert to float for Flutter charts
-            })
+            # Only include departments with issues
+            if count > 0:
+                data.append({
+                    "department": dept_name,
+                    "issues_count": float(count)
+                })
+        
+        print(f"✅ Bar chart data: {data}")
         
         return {
             "data": data,
@@ -1576,10 +1608,12 @@ async def get_issues_by_department(
         }
         
     except Exception as e:
+        print(f"❌ Error fetching issues by department: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching issues by department: {str(e)}"
         )
+
 
 # 5. Submit Feedback for Department - REMOVE AUTH
 @app.post("/api/departments/feedback")
@@ -1647,7 +1681,6 @@ async def update_issues_status(
             detail=f"Error updating issues status: {str(e)}"
         )
 
-# 7. Get Department Efficiency Trend
 @app.get("/api/departments/{dept_id}/efficiency-trend")
 async def get_department_efficiency_trend(
     dept_id: int,
@@ -1655,30 +1688,51 @@ async def get_department_efficiency_trend(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get efficiency trend for a specific department over months
+    Get efficiency trend for a specific department
     """
     try:
-        # Mock trend data - in production, calculate from historical data
-        trend_data = {
-            1: [65, 72, 78, 82, 85, 88.3],  # Water Dept
-            2: [70, 75, 80, 85, 90, 92.5],   # Road Dept
-            3: [60, 62, 65, 68, 70, 72.8],   # Sanitation Dept  
-            4: [75, 78, 80, 83, 86, 88.3]    # Electricity Dept
+        id_to_dept = {
+            1: ("water_dept", "Water Dept"),
+            2: ("road_dept", "Road Dept"),
+            3: ("sanitation_dept", "Sanitation Dept"),
+            4: ("electricity_dept", "Electricity Dept"),
+            5: ("other", "Other")
         }
         
-        if dept_id not in trend_data:
+        if dept_id not in id_to_dept:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Department not found"
             )
         
+        dept_key, dept_name = id_to_dept[dept_id]
+        
+        # Get current efficiency
+        total_result = await db.execute(
+            select(func.count(Report.id))
+            .where(Report.department == dept_key)
+        )
+        total = total_result.scalar() or 0
+        
+        resolved_result = await db.execute(
+            select(func.count(Report.id))
+            .where(Report.department == dept_key)
+            .where(Report.status == "Resolved")
+        )
+        resolved = resolved_result.scalar() or 0
+        
+        current_efficiency = (resolved / total * 100) if total > 0 else 0
+        
+        # Generate trend based on current efficiency
+        trend_data = generate_trend_data(current_efficiency)
+        
         month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         
         return {
             "department_id": dept_id,
-            "efficiency_trend": trend_data[dept_id][-months:],
+            "efficiency_trend": trend_data[-months:],
             "months": month_names[-months:],
-            "current_efficiency": trend_data[dept_id][-1]
+            "current_efficiency": current_efficiency
         }
         
     except HTTPException:
@@ -2315,3 +2369,279 @@ async def get_category_breakdown(db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching category breakdown: {str(e)}"
         )
+    
+
+
+class IssueRequest(BaseModel):
+    description: str
+    image_data: Optional[str] = None
+
+def combine_predictions(text_pred, text_confidence, img_pred=None, img_confidence=None):
+    """
+    Combine text and image predictions intelligently
+    """
+    # If no image, use text prediction
+    if img_pred is None:
+        return text_pred, text_confidence
+    
+    # If both predictions agree, use with higher confidence
+    if text_pred == img_pred:
+        final_confidence = max(text_confidence, img_confidence)
+        return text_pred, final_confidence
+    
+    # If predictions disagree, use the one with higher confidence
+    # You can adjust these thresholds based on your testing
+    text_weight = text_confidence / 100
+    img_weight = img_confidence / 100
+    
+    # Weighted decision (you can tune these weights)
+    if text_confidence >= 70:  # High confidence in text
+        return text_pred, text_confidence
+    elif img_confidence >= 80:  # High confidence in image
+        return img_pred, img_confidence
+    else:
+        # Default to text prediction if both are uncertain
+        return text_pred, text_confidence
+
+@app.post("/predict-department")
+async def predict_department(
+    description: str = Form(...),
+    image: Optional[UploadFile] = File(None)
+):
+    try:
+        # Step 1: Get text prediction
+        text_pred, text_conf, text_top3 = predict_department_from_text(description)
+        
+        # Step 2: Get image prediction if available
+        img_pred = None
+        img_conf = None
+        
+        if image and image.content_type.startswith('image/'):
+            image_bytes = await image.read()
+            processed_image = preprocess_image(image_bytes)
+            predictions = model.predict(processed_image)
+            class_idx = np.argmax(predictions[0])
+            original_pred = original_class_labels[class_idx]
+            img_conf = float(predictions[0][class_idx]) * 100
+            img_pred = department_mapping.get(original_pred, "other")
+        
+        # Step 3: Combine predictions
+        final_department, final_confidence = combine_predictions(
+            text_pred, text_conf, img_pred, img_conf
+        )
+        
+        return {
+            "final_department": final_department,
+            "final_confidence": final_confidence,
+            "text_prediction": {
+                "department": text_pred,
+                "confidence": text_conf,
+                "top3_alternatives": text_top3
+            },
+            "image_prediction": {
+                "department": img_pred,
+                "confidence": img_conf
+            } if img_pred else None,
+            "success": True
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Prediction error: {str(e)}")
+
+@app.post("/predict-text-only")
+async def predict_text_only(description: str):
+    """Endpoint for text-only prediction"""
+    try:
+        pred, confidence, top3 = predict_department_from_text(description)
+        return {
+            "department": pred,
+            "confidence": confidence,
+            "top3_alternatives": top3,
+            "success": True
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Text prediction error: {str(e)}")
+
+
+
+@app.post("/api/ai/auto-assign")
+async def auto_assign_departments(
+    force_reassign: bool = Body(False),
+    urgency_level: str = Body("Medium"),  # ✅ CHANGED: "Medium" with capital M
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Auto-assign departments to unassigned issues using your existing AI prediction
+    """
+    try:
+        # Validate urgency_level against your validator
+        valid_urgency_levels = ["High", "Medium", "Low"]
+        if urgency_level not in valid_urgency_levels:
+            raise HTTPException(
+                status_code=400, 
+                detail=f'Urgency level must be one of: {", ".join(valid_urgency_levels)}'
+            )
+        
+        # Get unassigned or force-reassign all issues
+        if force_reassign:
+            stmt = select(Report).where(Report.status.in_(["Pending", "In Progress"]))
+        else:
+            stmt = select(Report).where(Report.department == "other")
+        
+        result = await db.execute(stmt)
+        issues = result.scalars().all()
+        
+        assigned_count = 0
+        processed_count = 0
+        
+        for issue in issues:
+            try:
+                processed_count += 1
+                
+                # Skip if description is too short for meaningful prediction
+                if not issue.description or len(issue.description.strip()) < 10:
+                    continue
+                
+                print(f"🔍 Processing issue {issue.id}: {issue.description[:50]}...")
+                
+                # ✅ FIXED: Use your existing text-only prediction endpoint
+                prediction_response = await predict_text_only(issue.description)
+                
+                if (prediction_response.get('success') and 
+                    prediction_response.get('department') != 'other' and
+                    prediction_response.get('confidence', 0) > 50):  # Minimum confidence threshold
+                    
+                    issue.department = prediction_response['department']
+                    issue.auto_assigned = True
+                    issue.prediction_confidence = prediction_response['confidence']
+                    assigned_count += 1
+                    
+                    print(f"✅ Assigned issue {issue.id} to {issue.department} "
+                          f"(confidence: {prediction_response['confidence']}%)")
+                
+                # Add small delay to avoid overwhelming the system
+                await asyncio.sleep(0.1)
+                
+            except Exception as e:
+                print(f"❌ Failed to process issue {issue.id}: {e}")
+                continue
+        
+        await db.commit()
+        
+        return {
+            "message": f"AI auto-assignment completed. {assigned_count} issues assigned out of {processed_count} processed.",
+            "assigned_count": assigned_count,
+            "processed_count": processed_count,
+            "total_issues": len(issues),
+            "urgency_level": urgency_level  # ✅ Include the urgency level in response
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Auto-assignment failed: {str(e)}")
+@app.get("/api/ai/assignment-status")
+async def get_assignment_status(db: AsyncSession = Depends(get_db)):
+    """
+    Get AI assignment statistics
+    """
+    try:
+        # Count auto-assigned issues
+        auto_assigned_result = await db.execute(
+            select(func.count(Report.id))
+            .where(Report.auto_assigned == True)
+        )
+        auto_assigned_count = auto_assigned_result.scalar() or 0
+        
+        # Count total issues
+        total_result = await db.execute(select(func.count(Report.id)))
+        total_issues = total_result.scalar() or 0
+        
+        # Count unassigned issues
+        unassigned_result = await db.execute(
+            select(func.count(Report.id))
+            .where(Report.department == "other")
+        )
+        unassigned_count = unassigned_result.scalar() or 0
+        
+        # Count by department for auto-assigned issues
+        dept_result = await db.execute(
+            select(Report.department, func.count(Report.id))
+            .where(Report.auto_assigned == True)
+            .group_by(Report.department)
+        )
+        dept_counts = dict(dept_result.all())
+        
+        # Get average confidence for auto-assigned issues
+        confidence_result = await db.execute(
+            select(func.avg(Report.prediction_confidence))
+            .where(Report.auto_assigned == True)
+        )
+        avg_confidence = confidence_result.scalar() or 0
+        
+        return {
+            "auto_assigned_count": auto_assigned_count,
+            "total_issues": total_issues,
+            "unassigned_count": unassigned_count,
+            "auto_assigned_percentage": round((auto_assigned_count / total_issues * 100) if total_issues > 0 else 0, 1),
+            "department_breakdown": dept_counts,
+            "average_confidence": round(avg_confidence, 1),
+            "ready_for_assignment": unassigned_count > 0
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get assignment status: {str(e)}")
+
+@app.get("/api/ai/auto-assigned-issues")
+async def get_auto_assigned_issues(
+    department: Optional[str] = None,
+    period: str = "month",
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get list of auto-assigned issues for a specific department
+    """
+    try:
+        stmt = select(Report).where(Report.auto_assigned == True)
+        
+        if department and department != "all":
+            stmt = stmt.where(Report.department == department)
+        
+        # Add time period filter if needed
+        if period != "all":
+            # Calculate date range based on period
+            from datetime import datetime, timedelta
+            if period == "week":
+                start_date = datetime.utcnow() - timedelta(days=7)
+            elif period == "month":
+                start_date = datetime.utcnow() - timedelta(days=30)
+            else:  # year
+                start_date = datetime.utcnow() - timedelta(days=365)
+            
+            stmt = stmt.where(Report.created_at >= start_date)
+        
+        result = await db.execute(stmt)
+        issues = result.scalars().all()
+        
+        issues_data = []
+        for issue in issues:
+            issues_data.append({
+                "id": issue.id,
+                "description": issue.description,
+                "department": issue.department,
+                "prediction_confidence": issue.prediction_confidence,
+                "status": issue.status,
+                "created_at": issue.created_at.isoformat() if issue.created_at else None,
+                "category": issue.category
+            })
+        
+        return {
+            "issues": issues_data,
+            "count": len(issues_data),
+            "department": department or "all",
+            "period": period
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get auto-assigned issues: {str(e)}")
