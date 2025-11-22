@@ -1991,43 +1991,54 @@ async def get_map_issues(
     Get all issues with coordinates for map display
     """
     try:
-        # Build query using select
+        # Build query - ensure coordinates exist
         stmt = select(Report).where(
             Report.location_lat.isnot(None), 
             Report.location_long.isnot(None)
         )
         
-        if status and status != "all":
+        # Filter by status if provided
+        if status and status.lower() != "all":
             stmt = stmt.where(Report.status == status)
         
-        if category and category != "all":
-            stmt = stmt.where(Report.category == category)
+        # Filter by urgency level (not category) if provided
+        if category and category.lower() != "all":
+            # Actually filtering by urgency_level based on your Flutter code
+            stmt = stmt.where(Report.urgency_level == category)
         
         # Execute query
         result = await db.execute(stmt)
         reports = result.scalars().all()
         
-        # Format response
+        # Format response - handle None values gracefully
         map_issues = []
         for report in reports:
-            map_issues.append(MapIssueResponse(
-                id=report.id,
-                title=report.title,
-                category=report.category,
-                status=report.status,
-                urgency_level=report.urgency_level,
-                location_lat=report.location_lat,
-                location_long=report.location_long,
-                description=report.description,
-                created_at=report.created_at,
-                user_email=report.user_email,
-                location_address=report.location_address
-            ))
+            try:
+                map_issues.append(MapIssueResponse(
+                    id=report.id,
+                    title=report.title or "Untitled Issue",
+                    status=report.status or "Pending",
+                    urgency_level=report.urgency_level or "Medium",
+                    location_lat=report.location_lat,
+                    location_long=report.location_long,
+                    description=report.description,
+                    created_at=report.created_at or datetime.utcnow(),
+                    user_email=report.user_email,
+                    location_address=report.location_address
+                ))
+            except Exception as e:
+                print(f"Error processing report {report.id}: {str(e)}")
+                continue
         
         return MapIssuesResponse(issues=map_issues)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching map issues: {str(e)}")
+        print(f"Error in get_map_issues: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error fetching map issues: {str(e)}"
+        )
+
 
 @app.get("/api/admin/map/issues-in-bounds", response_model=MapIssuesResponse)
 async def get_issues_in_bounds(
@@ -2043,11 +2054,17 @@ async def get_issues_in_bounds(
     try:
         # Validate bounds
         if north <= south:
-            raise HTTPException(status_code=400, detail="North must be greater than south")
+            raise HTTPException(
+                status_code=400, 
+                detail="North must be greater than south"
+            )
         if east <= west:
-            raise HTTPException(status_code=400, detail="East must be greater than west")
+            raise HTTPException(
+                status_code=400, 
+                detail="East must be greater than west"
+            )
         
-        # Build async query
+        # Build query with bounds
         stmt = select(Report).where(
             Report.location_lat.isnot(None),
             Report.location_long.isnot(None),
@@ -2058,26 +2075,35 @@ async def get_issues_in_bounds(
         result = await db.execute(stmt)
         reports = result.scalars().all()
         
+        # Format response
         map_issues = []
         for report in reports:
-            map_issues.append(MapIssueResponse(
-                id=report.id,
-                title=report.title,
-                category=report.category,
-                status=report.status,
-                urgency_level=report.urgency_level,
-                location_lat=report.location_lat,
-                location_long=report.location_long,
-                description=report.description,
-                created_at=report.created_at,
-                user_email=report.user_email,
-                location_address=report.location_address
-            ))
+            try:
+                map_issues.append(MapIssueResponse(
+                    id=report.id,
+                    title=report.title or "Untitled Issue",
+                    status=report.status or "Pending",
+                    urgency_level=report.urgency_level or "Medium",
+                    location_lat=report.location_lat,
+                    location_long=report.location_long,
+                    description=report.description,
+                    created_at=report.created_at or datetime.utcnow(),
+                    user_email=report.user_email,
+                    location_address=report.location_address
+                ))
+            except Exception as e:
+                print(f"Error processing report {report.id}: {str(e)}")
+                continue
         
         return MapIssuesResponse(issues=map_issues)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching bounded issues: {str(e)}")
+        print(f"Error in get_issues_in_bounds: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error fetching bounded issues: {str(e)}"
+        )
+
 
 @app.get("/api/admin/map/stats", response_model=MapStatsResponse)
 async def get_map_stats(db: AsyncSession = Depends(get_db)):
@@ -2085,7 +2111,7 @@ async def get_map_stats(db: AsyncSession = Depends(get_db)):
     Get statistics for map view
     """
     try:
-        # Count issues with coordinates using async
+        # Count total issues with coordinates
         stmt_total = select(Report).where(
             Report.location_lat.isnot(None),
             Report.location_long.isnot(None)
@@ -2093,7 +2119,7 @@ async def get_map_stats(db: AsyncSession = Depends(get_db)):
         result_total = await db.execute(stmt_total)
         total_issues = len(result_total.scalars().all())
         
-        # Count by status
+        # Count by status - Pending
         stmt_pending = select(Report).where(
             Report.status == "Pending",
             Report.location_lat.isnot(None),
@@ -2102,6 +2128,7 @@ async def get_map_stats(db: AsyncSession = Depends(get_db)):
         result_pending = await db.execute(stmt_pending)
         pending_issues = len(result_pending.scalars().all())
         
+        # Count by status - In Progress
         stmt_in_progress = select(Report).where(
             Report.status == "In Progress",
             Report.location_lat.isnot(None),
@@ -2110,6 +2137,7 @@ async def get_map_stats(db: AsyncSession = Depends(get_db)):
         result_in_progress = await db.execute(stmt_in_progress)
         in_progress_issues = len(result_in_progress.scalars().all())
         
+        # Count by status - Resolved
         stmt_resolved = select(Report).where(
             Report.status == "Resolved",
             Report.location_lat.isnot(None),
@@ -2118,26 +2146,19 @@ async def get_map_stats(db: AsyncSession = Depends(get_db)):
         result_resolved = await db.execute(stmt_resolved)
         resolved_issues = len(result_resolved.scalars().all())
         
-        # Get unique categories
-        stmt_categories = select(Report.category).where(
-            Report.location_lat.isnot(None)
-        ).distinct()
-        result_categories = await db.execute(stmt_categories)
-        categories_result = result_categories.scalars().all()
-        
-        categories = [cat for cat in categories_result if cat]
-        
         return MapStatsResponse(
             total_issues=total_issues,
             pending_issues=pending_issues,
             in_progress_issues=in_progress_issues,
-            resolved_issues=resolved_issues,
-            categories=categories
+            resolved_issues=resolved_issues
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching map stats: {str(e)}")
-    
+        print(f"Error in get_map_stats: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error fetching map stats: {str(e)}"
+        )
 
 
 # Admin Dashboard Endpoints

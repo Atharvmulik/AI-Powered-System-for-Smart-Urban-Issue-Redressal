@@ -414,13 +414,11 @@ class UserProfileUpdate(BaseModel):
     
 
 # ========== MAP SCHEMAS ==========
-
 class MapIssueResponse(BaseModel):
     id: int
     title: str
-    category: str
     status: str
-    urgency_level: str
+    urgency_level: str  # This is what you're actually using in Flutter
     location_lat: float
     location_long: float
     description: Optional[str] = None
@@ -431,8 +429,10 @@ class MapIssueResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class MapIssuesResponse(BaseModel):
     issues: List[MapIssueResponse]
+
 
 class MapBoundsRequest(BaseModel):
     north: float
@@ -464,9 +464,9 @@ class MapBoundsRequest(BaseModel):
             raise ValueError('West bound must be between -180 and 180')
         return v
 
+
 class MapStatsResponse(BaseModel):
     total_issues: int
     pending_issues: int
     in_progress_issues: int
     resolved_issues: int
-    categories: List[str]
