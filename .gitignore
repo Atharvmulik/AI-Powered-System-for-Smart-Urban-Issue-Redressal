@@ -1,0 +1,17 @@
+# Ignore Python venv
+venv/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore environment variables
+.env
+
+# Ignore model files
+*.h5
+*.pickle
+*.pkl
+
+# Ignore logs
+*.log
