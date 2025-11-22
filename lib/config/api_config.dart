@@ -76,28 +76,27 @@ class ApiConfig {
   
   // ==================== MAP HELPER METHODS ====================
   
-  // Map helper methods
   static String buildMapIssuesUrl({String? status, String? category}) {
-    String url = '$baseUrl$mapIssues';
-    final params = <String>[];
-    
-    if (status != null && status != 'all') params.add('status=$status');
-    if (category != null && category != 'all') params.add('category=$category');
-    
-    if (params.isNotEmpty) {
-      url += '?${params.join('&')}';
-    }
-    
-    return url;
+  String url = mapIssues; // Just the endpoint path
+  final params = <String>[];
+  
+  if (status != null && status != 'all') params.add('status=$status');
+  if (category != null && category != 'all') params.add('category=$category');
+  
+  if (params.isNotEmpty) {
+    url += '?${params.join('&')}';
   }
   
-  static String buildMapIssuesInBoundsUrl(double north, double south, double east, double west) {
-    return '$baseUrl$mapIssuesInBounds?north=$north&south=$south&east=$east&west=$west';
-  }
-  
-  static String buildMapStatsUrl() {
-    return '$baseUrl$mapStats';
-  }
+  return url; // Returns: "/api/admin/map/issues?status=pending"
+}
+
+static String buildMapIssuesInBoundsUrl(double north, double south, double east, double west) {
+  return '$mapIssuesInBounds?north=$north&south=$south&east=$east&west=$west';
+}
+
+static String buildMapStatsUrl() {
+  return mapStats;
+}
   
   // ==================== EXISTING HELPER METHODS ====================
   

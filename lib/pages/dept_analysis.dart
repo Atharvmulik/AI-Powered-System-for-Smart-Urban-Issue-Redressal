@@ -1,4 +1,3 @@
-// analytics_page.dart - FIXED VERSION
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/api_service.dart';

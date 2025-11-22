@@ -39,14 +39,27 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
       final ApiService apiService = ApiService();
       final response = await apiService.getMapIssues();
       
+      print('📡 Response Status: ${response.statusCode}');
+      print('📄 Response Body: ${response.body}');
+      
       if (response.statusCode == 200) {
-        final List<dynamic> issues = json.decode(response.body);
-        _createMarkersFromRealData(issues);
+        // ✅ FIX: Parse as Map first, then extract 'issues' array
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        final List<dynamic> issues = responseData['issues'] ?? [];
+        
+        print('✅ Found ${issues.length} issues');
+        
+        if (issues.isEmpty) {
+          print('⚠️ No issues found, loading sample data');
+          _addSampleMarkers();
+        } else {
+          _createMarkersFromRealData(issues);
+        }
       } else {
         throw Exception('Failed to load issues: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error loading issues: $e');
+      print('❌ Error loading issues: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load issues: $e')),
       );
@@ -57,35 +70,45 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
     setState(() => isLoading = false);
   }
 
-  // 🎯 Create markers from real backend data - SINGLE VERSION
+  // 🎯 Create markers from real backend data
   void _createMarkersFromRealData(List<dynamic> issues) {
     setState(() {
       issueMarkers.clear();
     });
 
     for (final issue in issues) {
-      // Extract coordinates from your issue data structure
-      final double? lat = _parseDouble(issue['location_lat'] ?? issue['latitude']);
-      final double? lon = _parseDouble(issue['location_long'] ?? issue['longitude']);
-      
-      if (lat != null && lon != null) {
-        final marker = _createIssueMarker(
-          lat,
-          lon,
-          issue['status'] ?? 'Pending',
-          issue['category'] ?? 'General Issue',
-          issueId: issue['id'],
-          title: issue['title'],
-          description: issue['description'],
-          createdAt: issue['created_at'],
-          urgency: issue['urgency_level'],
-          userEmail: issue['user_email'],
-        );
-        setState(() {
-          issueMarkers.add(marker);
-        });
+      try {
+        // Extract coordinates
+        final double? lat = _parseDouble(issue['location_lat']);
+        final double? lon = _parseDouble(issue['location_long']);
+        
+        if (lat != null && lon != null) {
+          print('📍 Adding marker for issue ${issue['id']} at ($lat, $lon)');
+          
+          final marker = _createIssueMarker(
+            lat,
+            lon,
+            issue['status'] ?? 'Pending',
+            issue['urgency_level'] ?? 'Medium',
+            issueId: issue['id'],
+            title: issue['title'],
+            description: issue['description'],
+            createdAt: issue['created_at'],
+            userEmail: issue['user_email'],
+          );
+          
+          setState(() {
+            issueMarkers.add(marker);
+          });
+        } else {
+          print('⚠️ Invalid coordinates for issue ${issue['id']}: lat=$lat, lon=$lon');
+        }
+      } catch (e) {
+        print('❌ Error creating marker for issue: $e');
       }
     }
+    
+    print('✅ Total markers added: ${issueMarkers.length}');
   }
 
   double? _parseDouble(dynamic value) {
@@ -101,15 +124,14 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
     double lat, 
     double lon, 
     String status, 
-    String type, {
+    String urgency, {
     int? issueId,
     String? title,
     String? description,
     String? createdAt,
-    String? urgency,
     String? userEmail,
   }) {
-    Color markerColor = _getStatusColor(status);
+    Color markerColor = _getUrgencyColor(urgency);
 
     return Marker(
       width: 28,
@@ -123,7 +145,6 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
               'lat': lat,
               'lon': lon,
               'status': status,
-              'type': type,
               'title': title,
               'description': description,
               'created_at': createdAt,
@@ -150,7 +171,7 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
           ),
           child: Center(
             child: Text(
-              _getStatusIcon(status),
+              _getUrgencyIcon(urgency),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 12,
@@ -163,19 +184,39 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
     );
   }
 
-  String _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
+  // 🔴🟠🟡🟢 Urgency-based colors
+  Color _getUrgencyColor(String urgency) {
+    switch (urgency.toLowerCase()) {
+      case 'urgent':
+        return Colors.red;
+      case 'high':
+        return Colors.orange;
+      case 'medium':
+        return Colors.yellow;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  // ⚠️🚨 Urgency-based icons
+  String _getUrgencyIcon(String urgency) {
+    switch (urgency.toLowerCase()) {
+      case 'urgent':
+        return '!!!';
+      case 'high':
+        return '!!';
+      case 'medium':
         return '!';
-      case 'in progress':
-        return '⟳';
-      case 'resolved':
-        return '✓';
+      case 'low':
+        return '•';
       default:
         return '•';
     }
   }
 
+  // Status-based colors (for info box)
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -239,21 +280,28 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
         'location_lat': 18.5204,
         'location_long': 73.8567,
         'status': 'Pending',
-        'category': 'Garbage',
+        'urgency_level': 'Urgent',
         'id': 1,
         'title': 'Sample Issue 1',
         'description': 'This is a sample issue',
-        'urgency_level': 'High'
       },
       {
         'location_lat': 18.5304,
         'location_long': 73.8667,
         'status': 'In Progress',
-        'category': 'Water',
+        'urgency_level': 'High',
         'id': 2,
         'title': 'Sample Issue 2',
         'description': 'This is another sample issue',
-        'urgency_level': 'Medium'
+      },
+      {
+        'location_lat': 18.5404,
+        'location_long': 73.8467,
+        'status': 'Resolved',
+        'urgency_level': 'Low',
+        'id': 3,
+        'title': 'Sample Issue 3',
+        'description': 'This is a resolved issue',
       },
     ];
     
@@ -357,7 +405,7 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
             ),
           ),
 
-          // 🎯 Status Legend
+          // 🎯 Urgency Legend
           Positioned(
             bottom: 20,
             left: 15,
@@ -378,16 +426,17 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Issue Status',
+                    'Issue Urgency',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildLegendItem(Colors.red, 'Pending', '!'),
-                  _buildLegendItem(Colors.orange, 'In Progress', '⟳'),
-                  _buildLegendItem(Colors.green, 'Resolved', '✓'),
+                  _buildLegendItem(Colors.red, 'Urgent', '!!!'),
+                  _buildLegendItem(Colors.orange, 'High', '!!'),
+                  _buildLegendItem(Colors.yellow, 'Medium', '!'),
+                  _buildLegendItem(Colors.green, 'Low', '•'),
                 ],
               ),
             ),
@@ -520,42 +569,68 @@ class _AdminMapViewPageState extends State<AdminMapViewPage> {
             
             const SizedBox(height: 6),
             
-            // Type
-            Text(
-              'Type: ${selectedIssueInfo!['type']}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-              ),
-            ),
-            
             // Urgency
             if (selectedIssueInfo!['urgency'] != null)
-              Text(
-                'Urgency: ${selectedIssueInfo!['urgency']}',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
+              Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _getUrgencyColor(selectedIssueInfo!['urgency']),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Urgency: ${selectedIssueInfo!['urgency']}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ],
+              ),
+            
+            // Description
+            if (selectedIssueInfo!['description'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  selectedIssueInfo!['description'],
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             
             // User Email
             if (selectedIssueInfo!['user_email'] != null)
-              Text(
-                'Reported by: ${selectedIssueInfo!['user_email']}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Reported by: ${selectedIssueInfo!['user_email']}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
               ),
             
             // Created Date
             if (selectedIssueInfo!['created_at'] != null)
-              Text(
-                'Reported: ${_formatDate(selectedIssueInfo!['created_at'])}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Reported: ${_formatDate(selectedIssueInfo!['created_at'])}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
               ),
           ],
