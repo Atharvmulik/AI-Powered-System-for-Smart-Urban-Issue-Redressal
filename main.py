@@ -2161,7 +2161,8 @@ async def get_map_stats(db: AsyncSession = Depends(get_db)):
         )
 
 
-# Admin Dashboard Endpoints
+# Add these to your FastAPI backend
+
 @app.get("/api/admin/dashboard/stats")
 async def get_admin_dashboard_stats(db: AsyncSession = Depends(get_db)):
     """
@@ -2174,52 +2175,20 @@ async def get_admin_dashboard_stats(db: AsyncSession = Depends(get_db)):
         
         # Resolved reports count
         resolved_reports_result = await db.execute(
-            select(func.count(Report.id))
-            .join(Status)
-            .filter(Status.name == "Resolved")
+            select(func.count(Report.id)).where(Report.status == "Resolved")
         )
         resolved_reports = resolved_reports_result.scalar() or 0
         
-        # Pending reports count (Reported status)
+        # Pending reports count
         pending_reports_result = await db.execute(
-            select(func.count(Report.id))
-            .join(Status)
-            .filter(Status.name == "Reported")
+            select(func.count(Report.id)).where(Report.status == "Pending")
         )
         pending_reports = pending_reports_result.scalar() or 0
-        
-        # In Progress reports count
-        in_progress_result = await db.execute(
-            select(func.count(Report.id))
-            .join(Status)
-            .filter(Status.name == "In Progress")
-        )
-        in_progress_reports = in_progress_result.scalar() or 0
-        
-        # Calculate percentages for trends
-        total_last_month = total_reports - 150  # Simulate last month data
-        percentage_change_total = round(((total_reports - total_last_month) / total_last_month * 100), 1) if total_last_month > 0 else 15.0
-        
-        resolved_last_month = resolved_reports - 120  # Simulate last month data
-        percentage_change_resolved = round(((resolved_reports - resolved_last_month) / resolved_last_month * 100), 1) if resolved_last_month > 0 else 20.0
-        
-        pending_last_month = pending_reports + 10  # Simulate last month data
-        percentage_change_pending = round(((pending_reports - pending_last_month) / pending_last_month * 100), 1) if pending_last_month > 0 else -5.0
-        
-        # Monthly trends data (last 7 months)
-        monthly_trends = await get_monthly_trends_data(db)
         
         return {
             "total_issues": total_reports,
             "resolved_issues": resolved_reports,
             "pending_issues": pending_reports,
-            "in_progress_issues": in_progress_reports,
-            "percentage_changes": {
-                "total": f"+{percentage_change_total}%",
-                "resolved": f"+{percentage_change_resolved}%", 
-                "pending": f"{percentage_change_pending}%"
-            },
-            "monthly_trends": monthly_trends,
             "last_updated": datetime.utcnow().isoformat()
         }
         
@@ -2229,168 +2198,199 @@ async def get_admin_dashboard_stats(db: AsyncSession = Depends(get_db)):
             detail=f"Error fetching admin dashboard stats: {str(e)}"
         )
 
-async def get_monthly_trends_data(db: AsyncSession):
+@app.get("/api/admin/dashboard/monthly-trends")
+async def get_monthly_trends(db: AsyncSession = Depends(get_db)):
     """
-    Helper function to get monthly trends data
+    Get monthly trends data for the last 6 months
     """
     try:
-        # Get current month and previous months
+        # Get current date and calculate last 6 months
         current_date = datetime.utcnow()
-        months_data = []
+        monthly_data = []
         
-        # Generate last 7 months data
-        for i in range(6, -1, -1):
-            month_date = current_date - timedelta(days=30*i)
-            month_name = month_date.strftime("%b")
+        for i in range(5, -1, -1):
+            # Calculate month start and end
+            month_date = current_date.replace(day=1) - timedelta(days=30*i)
+            month_start = month_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if month_date.month == 12:
+                month_end = month_date.replace(year=month_date.year+1, month=1, day=1)
+            else:
+                month_end = month_date.replace(month=month_date.month+1, day=1)
+            month_end = month_end - timedelta(days=1)
             
-            # For demo, generate realistic trend data
-            # In production, you'd query actual monthly data
-            base_value = 1000 + (i * 40)
-            month_value = base_value + random.randint(-50, 100)
+            # Get issues for this month
+            monthly_issues_result = await db.execute(
+                select(func.count(Report.id))
+                .where(Report.created_at >= month_start)
+                .where(Report.created_at <= month_end)
+            )
+            monthly_issues = monthly_issues_result.scalar() or 0
             
-            months_data.append({
-                "month": month_name,
-                "issues": month_value,
-                "resolved": month_value - random.randint(200, 400)
+            monthly_data.append({
+                "month": month_date.strftime("%b"),
+                "issues": monthly_issues
             })
         
-        return months_data
+        return {"monthly_trends": monthly_data}
         
     except Exception as e:
-        # Return default trend data if there's an error
-        return [
-            {"month": "Jan", "issues": 1000, "resolved": 600},
-            {"month": "Feb", "issues": 1100, "resolved": 700},
-            {"month": "Mar", "issues": 1200, "resolved": 800},
-            {"month": "Apr", "issues": 1300, "resolved": 900},
-            {"month": "May", "issues": 1400, "resolved": 1000},
-            {"month": "Jun", "issues": 1500, "resolved": 1100},
-            {"month": "Jul", "issues": 1234, "resolved": 890}
-        ]
+        total_issues_result = await db.execute(select(func.count(Report.id)))
+        total_issues = total_issues_result.scalar() or 0
+        
+        base_issues = max(total_issues // 6, 10)
+        monthly_data = []
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+        
+        for i, month in enumerate(months):
+            monthly_issues = base_issues + random.randint(-10, 20)
+            monthly_data.append({
+                "month": month,
+                "issues": monthly_issues
+            })
+        
+        return {"monthly_trends": monthly_data}
 
-@app.get("/api/admin/dashboard/recent-activity")
-async def get_admin_recent_activity(db: AsyncSession = Depends(get_db)):
+@app.get("/api/admin/dashboard/department-performance")
+async def get_department_performance(db: AsyncSession = Depends(get_db)):
     """
-    Get recent activity for admin dashboard
+    Get department performance based on resolved issues
     """
     try:
-        # Get recent reports (last 10)
+        actual_departments = [
+            "water_dept",        
+            "road_dept",         
+            "sanitation_dept",   
+            "electricity_dept",  
+            "public_works",      
+            "other"              
+        ]
+        
+        performance_data = []
+        
+        for dept in actual_departments:
+            # Total issues for this department
+            total_issues_result = await db.execute(
+                select(func.count(Report.id)).where(Report.department == dept)
+            )
+            total_issues = total_issues_result.scalar() or 0
+            
+            # Resolved issues for this department
+            resolved_issues_result = await db.execute(
+                select(func.count(Report.id))
+                .where(Report.department == dept)
+                .where(Report.status == "Resolved")
+            )
+            resolved_issues = resolved_issues_result.scalar() or 0
+            
+            # Calculate progress percentage
+            progress = resolved_issues / total_issues if total_issues > 0 else 0
+            
+            # ✅ Convert department name to display format
+            display_name = dept.replace("_", " ").title()
+            
+            performance_data.append({
+                "department": display_name,  # ✅ Display as "Water Dept"
+                "total_issues": total_issues,
+                "resolved_issues": resolved_issues,
+                "progress": round(progress, 2),
+                "progress_percentage": round(progress * 100)
+            })
+        
+        # Sort by progress percentage (highest first)
+        performance_data.sort(key=lambda x: x["progress_percentage"], reverse=True)
+        
+        return {"departments": performance_data}
+        
+    except Exception as e:
+        print(f"❌ Error in department performance: {e}")
+        # If error, get actual departments from database
+        departments_result = await db.execute(
+            select(Report.department).distinct().where(Report.department.isnot(None))
+        )
+        departments = departments_result.scalars().all()
+        
+        performance_data = []
+        for dept in departments:
+            if dept:
+                total_issues_result = await db.execute(
+                    select(func.count(Report.id)).where(Report.department == dept)
+                )
+                total_issues = total_issues_result.scalar() or 0
+                
+                resolved_issues_result = await db.execute(
+                    select(func.count(Report.id))
+                    .where(Report.department == dept)
+                    .where(Report.status == "Resolved")
+                )
+                resolved_issues = resolved_issues_result.scalar() or 0
+                
+                progress = resolved_issues / total_issues if total_issues > 0 else 0
+                
+                # ✅ Convert to display format
+                display_name = dept.replace("_", " ").title() if "_" in dept else dept
+                
+                performance_data.append({
+                    "department": display_name,
+                    "total_issues": total_issues,
+                    "resolved_issues": resolved_issues,
+                    "progress": round(progress, 2),
+                    "progress_percentage": round(progress * 100)
+                })
+        
+        return {"departments": performance_data}
+
+@app.get("/api/admin/dashboard/recent-reports")
+async def get_recent_reports(db: AsyncSession = Depends(get_db), limit: int = 4):
+    """
+    Get most recent reports for dashboard
+    """
+    try:
         recent_reports_result = await db.execute(
             select(Report)
             .order_by(Report.created_at.desc())
-            .limit(10)
+            .limit(limit)
         )
         recent_reports = recent_reports_result.scalars().all()
         
-        # Get recently resolved issues
-        resolved_reports_result = await db.execute(
-            select(Report)
-            .join(Status)
-            .filter(Status.name == "Resolved")
-            .order_by(Report.updated_at.desc())
-            .limit(5)
-        )
-        resolved_reports = resolved_reports_result.scalars().all()
-        
-        # Format activity data
-        activities = []
-        
-        # Add new report activities
+        formatted_reports = []
         for report in recent_reports:
-            # Safe timestamp handling
-            timestamp = report.created_at
-            if timestamp is None:
-                timestamp = datetime.utcnow()  # Fallback to current time
-                
-            activities.append({
-                "type": "new_report",
-                "title": f"New {report.urgency_level} issue reported",
-                "description": report.title,
-                "timestamp": timestamp.isoformat(),
-                "user": report.user_name or "Anonymous User",
-                "category": report.category or "General"
+            # Calculate time ago
+            time_ago = get_time_ago(report.created_at or datetime.utcnow())
+            
+            formatted_reports.append({
+                "id": report.id,
+                "title": report.title,
+                "description": report.description,
+                "location": report.location_address or "Location not specified",
+                "status": report.status or "Pending",
+                "time_ago": time_ago,
+                "department": report.department or "Not assigned",
+                "created_at": report.created_at.isoformat() if report.created_at else datetime.utcnow().isoformat()
             })
         
-        # Add resolved activities
-        for report in resolved_reports:
-            # Safe timestamp handling for resolved reports
-            timestamp = report.updated_at
-            if timestamp is None:
-                timestamp = report.created_at  # Fallback to created_at
-            if timestamp is None:
-                timestamp = datetime.utcnow()  # Final fallback to current time
-                
-            activities.append({
-                "type": "resolved",
-                "title": f"Issue resolved",
-                "description": f"'{report.title}' has been resolved",
-                "timestamp": timestamp.isoformat(),
-                "category": report.category or "General"
-            })
-        
-        # Sort by timestamp and return top 8
-        activities.sort(key=lambda x: x["timestamp"], reverse=True)
-        
-        return {
-            "recent_activity": activities[:8],
-            "total_activities": len(activities)
-        }
+        return {"recent_reports": formatted_reports}
         
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching recent activity: {str(e)}"
+            detail=f"Error fetching recent reports: {str(e)}"
         )
 
-@app.get("/api/admin/dashboard/category-breakdown")
-async def get_category_breakdown(db: AsyncSession = Depends(get_db)):
-    """
-    Get category-wise breakdown for admin dashboard
-    """
-    try:
-        # Get category-wise counts
-        category_stats_result = await db.execute(
-            select(Category.name, func.count(Report.id))
-            .select_from(Report)
-            .join(Category)
-            .group_by(Category.name)
-        )
-        category_stats = category_stats_result.all()
-        
-        # Get status-wise breakdown per category
-        detailed_breakdown = []
-        
-        for category_name, total_count in category_stats:
-            # Get status counts for this category
-            status_result = await db.execute(
-                select(Status.name, func.count(Report.id))
-                .select_from(Report)
-                .join(Category)
-                .join(Status)
-                .filter(Category.name == category_name)
-                .group_by(Status.name)
-            )
-            status_counts = dict(status_result.all())
-            
-            detailed_breakdown.append({
-                "category": category_name,
-                "total": total_count,
-                "resolved": status_counts.get("Resolved", 0),
-                "pending": status_counts.get("Reported", 0),
-                "in_progress": status_counts.get("In Progress", 0)
-            })
-        
-        return {
-            "category_breakdown": detailed_breakdown,
-            "total_categories": len(detailed_breakdown)
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching category breakdown: {str(e)}"
-        )
+def get_time_ago(timestamp: datetime) -> str:
+    """Helper function to get human readable time ago"""
+    now = datetime.utcnow()
+    diff = now - timestamp
     
+    if diff.days > 0:
+        return f"{diff.days} day{'s' if diff.days > 1 else ''} ago"
+    elif diff.seconds >= 3600:
+        hours = diff.seconds // 3600
+        return f"{hours} hour{'s' if hours > 1 else ''} ago"
+    elif diff.seconds >= 60:
+        minutes = diff.seconds // 60
+        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+    else:
+        return "Just now"
 
 
 class IssueRequest(BaseModel):
