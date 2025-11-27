@@ -170,6 +170,25 @@ class ApiService {
     }
   }
 
+  // In api_service.dart - Fix these methods:
+
+  // Get monthly trends data
+  Future<http.Response> getMonthlyTrends() async {
+    return await get(ApiConfig.adminMonthlyTrends);
+  }
+
+  // Get department performance data
+  Future<http.Response> getDepartmentPerformance() async {
+    return await get(ApiConfig.adminDepartmentPerformance);
+  }
+
+  // Get recent reports for dashboard
+  Future<http.Response> getRecentReports({int limit = 4}) async {
+    return await getWithParams(ApiConfig.adminRecentReports, {
+      'limit': limit.toString(),
+    });
+  }
+
   // ==================== AI AUTO-ASSIGNMENT ENDPOINTS ====================
 
   // Trigger AI auto-assignment for unassigned issues

@@ -54,6 +54,14 @@ class ApiConfig {
   static String get departmentEfficiencyTrend => "/api/departments"; // /{dept_id}/efficiency-trend
   static String get departmentFeedback => "/api/departments/feedback";
   static String get updateIssuesStatus => "/api/departments/update-issues-status";
+
+  // ==================== ADMIN DASHBOARD ENDPOINTS ====================
+  static const String adminDashboardStats = "/api/admin/dashboard/stats";
+  static const String adminMonthlyTrends = "/api/admin/dashboard/monthly-trends";
+  static const String adminDepartmentPerformance = "/api/admin/dashboard/department-performance";
+  static const String adminRecentReports = "/api/admin/dashboard/recent-reports";
+  static const String adminRecentActivity = "/api/admin/dashboard/recent-activity";
+  static const String adminCategoryBreakdown = "/api/admin/dashboard/category-breakdown";
   
   // Timeout settings
   static const int connectTimeout = 5000;
@@ -77,26 +85,26 @@ class ApiConfig {
   // ==================== MAP HELPER METHODS ====================
   
   static String buildMapIssuesUrl({String? status, String? category}) {
-  String url = mapIssues; // Just the endpoint path
-  final params = <String>[];
-  
-  if (status != null && status != 'all') params.add('status=$status');
-  if (category != null && category != 'all') params.add('category=$category');
-  
-  if (params.isNotEmpty) {
-    url += '?${params.join('&')}';
+    String url = mapIssues; // Just the endpoint path
+    final params = <String>[];
+    
+    if (status != null && status != 'all') params.add('status=$status');
+    if (category != null && category != 'all') params.add('category=$category');
+    
+    if (params.isNotEmpty) {
+      url += '?${params.join('&')}';
+    }
+    
+    return url; // Returns: "/api/admin/map/issues?status=pending"
   }
-  
-  return url; // Returns: "/api/admin/map/issues?status=pending"
-}
 
-static String buildMapIssuesInBoundsUrl(double north, double south, double east, double west) {
-  return '$mapIssuesInBounds?north=$north&south=$south&east=$east&west=$west';
-}
+  static String buildMapIssuesInBoundsUrl(double north, double south, double east, double west) {
+    return '$mapIssuesInBounds?north=$north&south=$south&east=$east&west=$west';
+  }
 
-static String buildMapStatsUrl() {
-  return mapStats;
-}
+  static String buildMapStatsUrl() {
+    return mapStats;
+  }
   
   // ==================== EXISTING HELPER METHODS ====================
   
@@ -181,6 +189,7 @@ static String buildMapStatsUrl() {
     return '$baseUrl/api/departments/summary?period=$period';
   }
 
+  // ==================== USER PROFILE ENDPOINTS ====================
   static const String userProfileByEmail = '/api/users/profile';
   static const String updateUserProfile = '/api/users/profile';
   static const String updateCurrentUserProfile = '/users/me';
@@ -197,16 +206,23 @@ static String buildMapStatsUrl() {
   static String buildUpdateCurrentUserProfileUrl() {
     return '$baseUrl$updateCurrentUserProfile';
   }
-
-  // ==================== ADMIN DASHBOARD ENDPOINTS ====================
-  static String get adminDashboardStats => "/api/admin/dashboard/stats";
-  static String get adminRecentActivity => "/api/admin/dashboard/recent-activity";
-  static String get adminCategoryBreakdown => "/api/admin/dashboard/category-breakdown";
   
-  
+  // ==================== ADMIN DASHBOARD HELPER METHODS ====================
   
   static String buildAdminDashboardStatsUrl() {
     return '$baseUrl$adminDashboardStats';
+  }
+  
+  static String buildAdminMonthlyTrendsUrl() {
+    return '$baseUrl$adminMonthlyTrends';
+  }
+  
+  static String buildAdminDepartmentPerformanceUrl() {
+    return '$baseUrl$adminDepartmentPerformance';
+  }
+  
+  static String buildAdminRecentReportsUrl({int limit = 4}) {
+    return '$baseUrl$adminRecentReports?limit=$limit';
   }
   
   static String buildAdminRecentActivityUrl() {
@@ -215,7 +231,6 @@ static String buildMapStatsUrl() {
   
   static String buildAdminCategoryBreakdownUrl() {
     return '$baseUrl$adminCategoryBreakdown';
-  
   }
 
   // ==================== AI PREDICTION ENDPOINTS ====================
@@ -236,4 +251,21 @@ static String buildMapStatsUrl() {
     return '$baseUrl$predictImage';
   }
 
+  // ==================== AI AUTO-ASSIGNMENT ENDPOINTS ====================
+  static String get aiAutoAssign => "/api/ai/auto-assign";
+  static String get aiAssignmentStatus => "/api/ai/assignment-status";
+  static String get aiAutoAssignedIssues => "/api/ai/auto-assigned-issues";
+
+  // Helper methods for AI auto-assignment
+  static String buildAIAutoAssignUrl() {
+    return '$baseUrl$aiAutoAssign';
+  }
+
+  static String buildAIAssignmentStatusUrl() {
+    return '$baseUrl$aiAssignmentStatus';
+  }
+
+  static String buildAIAutoAssignedIssuesUrl(String department, {String period = 'month'}) {
+    return '$baseUrl$aiAutoAssignedIssues?department=$department&period=$period';
+  }
 }

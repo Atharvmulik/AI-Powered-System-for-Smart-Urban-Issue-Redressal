@@ -24,58 +24,170 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _selectedIndex = 0;
-
+  
   // Real-time data variables
   int totalIssues = 0;
   int resolvedIssues = 0;
   int pendingIssues = 0;
   bool isLoading = true;
+  String? errorMessage;
   final ApiService apiService = ApiService();
-
-  final List<Widget> _pages = [];
+  
+  // New data variables
+  List<dynamic> monthlyTrends = [];
+  List<dynamic> departmentPerformance = [];
+  List<dynamic> recentReports = [];
 
   @override
   void initState() {
     super.initState();
-    _pages.addAll([
-      _buildDashboard(),
-      _buildPlaceholderPage("Department Analysis"),
-      _buildPlaceholderPage("Issue Reports"),
-      _buildPlaceholderPage("Map View"),
-      _buildPlaceholderPage("Profile Page"),
-    ]);
     _loadDashboardData();
   }
 
   Future<void> _loadDashboardData() async {
-    try {
-      setState(() {
-        isLoading = true;
-      });
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
 
-      // Fetch admin dashboard stats from backend
+    try {
+      print('🔄 Starting dashboard data load...');
+
+      // Load data sequentially with better error handling
+      await _loadStatsData();
+      await _loadMonthlyTrends();
+      await _loadDepartmentPerformance();
+      await _loadRecentReports();
+
+      print('✅ Dashboard data loaded successfully');
+      
+      setState(() {
+        isLoading = false;
+      });
+    } catch (e) {
+      print('❌ Error loading dashboard data: $e');
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Failed to load dashboard data: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _loadStatsData() async {
+    try {
+      print('📊 Loading stats data...');
       final response = await apiService.getAdminDashboardStats();
+      
+      print('Stats Response Status: ${response.statusCode}');
+      print('Stats Response Body: ${response.body}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
         setState(() {
           totalIssues = data['total_issues'] ?? 0;
           resolvedIssues = data['resolved_issues'] ?? 0;
           pendingIssues = data['pending_issues'] ?? 0;
-          isLoading = false;
         });
+        print('✅ Stats loaded: Total=$totalIssues, Resolved=$resolvedIssues, Pending=$pendingIssues');
       } else {
-        // Fallback to current values if API fails
-        setState(() {
-          isLoading = false;
-        });
+        print('⚠️ Stats API returned status ${response.statusCode}');
+        throw Exception('Failed to load stats: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error loading dashboard data: $e');
-      // Keep current values on error
+      print('❌ Error loading stats: $e');
+      // Set default values on error
       setState(() {
-        isLoading = false;
+        totalIssues = 0;
+        resolvedIssues = 0;
+        pendingIssues = 0;
+      });
+    }
+  }
+
+  Future<void> _loadMonthlyTrends() async {
+    try {
+      print('📈 Loading monthly trends...');
+      final response = await apiService.getMonthlyTrends();
+      
+      print('Trends Response Status: ${response.statusCode}');
+      print('Trends Response Body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          monthlyTrends = data['monthly_trends'] ?? [];
+        });
+        print('✅ Monthly trends loaded: ${monthlyTrends.length} months');
+      } else {
+        print('⚠️ Trends API returned status ${response.statusCode}');
+        throw Exception('Failed to load trends');
+      }
+    } catch (e) {
+      print('❌ Error loading monthly trends: $e');
+      // Set default data if API fails
+      setState(() {
+        monthlyTrends = [
+          {"month": "Jan", "issues": 45},
+          {"month": "Feb", "issues": 52},
+          {"month": "Mar", "issues": 48},
+          {"month": "Apr", "issues": 61},
+          {"month": "May", "issues": 55},
+          {"month": "Jun", "issues": 58}
+        ];
+      });
+    }
+  }
+
+  Future<void> _loadDepartmentPerformance() async {
+    try {
+      print('🏢 Loading department performance...');
+      final response = await apiService.getDepartmentPerformance();
+      
+      print('Dept Performance Response Status: ${response.statusCode}');
+      print('Dept Performance Response Body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          departmentPerformance = data['departments'] ?? [];
+        });
+        print('✅ Department performance loaded: ${departmentPerformance.length} departments');
+      } else {
+        print('⚠️ Dept Performance API returned status ${response.statusCode}');
+        throw Exception('Failed to load department performance');
+      }
+    } catch (e) {
+      print('❌ Error loading department performance: $e');
+      // Set empty list on error
+      setState(() {
+        departmentPerformance = [];
+      });
+    }
+  }
+
+  Future<void> _loadRecentReports() async {
+    try {
+      print('📋 Loading recent reports...');
+      final response = await apiService.getRecentReports(limit: 4);
+      
+      print('Recent Reports Response Status: ${response.statusCode}');
+      print('Recent Reports Response Body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          recentReports = data['recent_reports'] ?? [];
+        });
+        print('✅ Recent reports loaded: ${recentReports.length} reports');
+      } else {
+        print('⚠️ Recent Reports API returned status ${response.statusCode}');
+        throw Exception('Failed to load recent reports');
+      }
+    } catch (e) {
+      print('❌ Error loading recent reports: $e');
+      // Set empty list on error
+      setState(() {
+        recentReports = [];
       });
     }
   }
@@ -137,7 +249,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           IconButton(
             onPressed: () {
-              // Use direct navigation for logout
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const LoginSignupPage()),
@@ -148,7 +259,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         ],
       ),
-      body: _pages[_selectedIndex],
+      body: _getCurrentPage(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onNavTapped,
@@ -171,8 +282,53 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // 🌟 Dashboard Page
+  // ✅ NEW METHOD: Get current page dynamically
+  Widget _getCurrentPage() {
+    if (_selectedIndex == 0) {
+      return _buildDashboard();
+    } else {
+      return _buildPlaceholderPage("Page ${_selectedIndex + 1}");
+    }
+  }
+
+  // Dashboard Page
   Widget _buildDashboard() {
+    // Show error message if there's an error
+    if (errorMessage != null && !isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text(
+              'Error Loading Dashboard',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadDashboardData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -232,52 +388,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             decoration: _whiteCardDecoration(),
             child: SizedBox(
               height: 220,
-              child: LineChart(LineChartData(
-                gridData: FlGridData(show: true, drawVerticalLine: false),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      getTitlesWidget: (value, meta) {
-                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-                        if (value.toInt() >= 0 && value.toInt() < months.length) {
-                          return Text(months[value.toInt()]);
-                        }
-                        return const Text('');
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 28,
-                        getTitlesWidget: (value, meta) {
-                          return Text(value.toInt().toString());
-                        }),
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    isCurved: true,
-                    color: Colors.deepPurple,
-                    barWidth: 3,
-                    belowBarData: BarAreaData(
-                        show: true,
-                        color: Colors.deepPurple.withOpacity(0.1)),
-                    spots: const [
-                      FlSpot(0, 3),
-                      FlSpot(1, 2),
-                      FlSpot(2, 4),
-                      FlSpot(3, 3.5),
-                      FlSpot(4, 4.8),
-                      FlSpot(5, 4.2),
-                      FlSpot(6, 4.6),
-                    ],
-                  )
-                ],
-              )),
+              child: monthlyTrends.isEmpty 
+                  ? _buildLoadingChart()
+                  : _buildMonthlyTrendsChart(),
             ),
           ),
           const SizedBox(height: 20),
@@ -287,66 +400,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: _whiteCardDecoration(),
-            child: Column(
-              children: [
-                _buildDeptPerformanceBar("Public Works", 0.85, Colors.orange),
-                _buildDeptPerformanceBar("Sanitation", 0.70, Colors.green),
-                _buildDeptPerformanceBar("Traffic", 0.50, Colors.blue),
-                _buildDeptPerformanceBar("Parks", 0.60, Colors.purple),
-              ],
-            ),
+            child: departmentPerformance.isEmpty
+                ? _buildEmptyDepartmentPerformance()
+                : _buildDepartmentPerformanceList(),
           ),
           const SizedBox(height: 20),
 
-          _buildSectionTitle("Issue Breakdown"),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: _whiteCardDecoration(),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 180,
-                  child: PieChart(PieChartData(
-                    centerSpaceRadius: 40,
-                    sectionsSpace: 2,
-                    sections: [
-                      _buildPieSection(Colors.teal, 35, "35%"),
-                      _buildPieSection(Colors.deepPurple, 25, "25%"),
-                      _buildPieSection(Colors.orange, 20, "20%"),
-                      _buildPieSection(Colors.blue, 20, "20%"),
-                    ],
-                  )),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 12,
-                  children: const [
-                    _Legend(color: Colors.teal, text: "Potholes"),
-                    _Legend(color: Colors.deepPurple, text: "Streetlights"),
-                    _Legend(color: Colors.orange, text: "Waste"),
-                    _Legend(color: Colors.blue, text: "Other"),
-                  ],
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 25),
-
-          // 🆕 Recent Reports Section
           _buildSectionTitle("Recent Reports"),
           const SizedBox(height: 10),
-          _buildRecentReport("Large pothole on Main St", "Oakland, CA • 2 hours ago",
-              "Pending", Colors.orange, Icons.construction_outlined),
-          _buildRecentReport("Broken streetlight at 5th & Elm",
-              "Springfield, IL • 8 hours ago", "In Progress", Colors.blueAccent,
-              Icons.lightbulb_outline),
-          _buildRecentReport("Overflowing trash can in City Park",
-              "Columbus, OH • 1 day ago", "Resolved", Colors.green,
-              Icons.delete_outline),
-          _buildRecentReport("Fallen tree blocking side road",
-              "Portland, OR • 1 day ago", "Urgent", Colors.redAccent,
-              Icons.warning_amber_rounded),
+          recentReports.isEmpty
+              ? _buildEmptyRecentReports()
+              : _buildRecentReportsList(),
           const SizedBox(height: 20),
         ],
       ),
@@ -380,16 +444,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         margin: const EdgeInsets.all(6),
         padding: const EdgeInsets.all(16),
         decoration: _whiteCardDecoration(),
-        child: Column(
+        child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
+            SizedBox(
               width: 24,
               height: 24,
-              child: const CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            const SizedBox(height: 8),
-            const Text("Loading...", 
+            SizedBox(height: 8),
+            Text("Loading...", 
                 style: TextStyle(color: Colors.grey)),
           ],
         ),
@@ -429,9 +493,195 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // 🔹 Recent Report Card
+  // Monthly Trends Chart with Real Data
+  Widget _buildMonthlyTrendsChart() {
+    // Prepare data for chart
+    final spots = monthlyTrends.asMap().entries.map((entry) {
+      final index = entry.key;
+      final data = entry.value;
+      return FlSpot(index.toDouble(), (data['issues'] ?? 0).toDouble());
+    }).toList();
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(show: true, drawVerticalLine: false),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              getTitlesWidget: (value, meta) {
+                if (value.toInt() >= 0 && value.toInt() < monthlyTrends.length) {
+                  return Text(monthlyTrends[value.toInt()]['month'] ?? '');
+                }
+                return const Text('');
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              getTitlesWidget: (value, meta) {
+                return Text(value.toInt().toString());
+              },
+            ),
+          ),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            isCurved: true,
+            color: Colors.deepPurple,
+            barWidth: 3,
+            belowBarData: BarAreaData(
+              show: true,
+              color: Colors.deepPurple.withOpacity(0.1)
+            ),
+            spots: spots,
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingChart() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 10),
+          Text("Loading trends...", style: TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  // Department Performance with Real Data
+  Widget _buildDepartmentPerformanceList() {
+    return Column(
+      children: departmentPerformance.map((dept) {
+        final progress = (dept['progress'] ?? 0.0).toDouble();
+        final progressPercent = (progress * 100).toInt();
+        final color = _getDepartmentColor(progress);
+        
+        return _buildDeptPerformanceBar(
+          dept['department'] ?? 'Unknown Department',
+          progress,
+          color,
+          progressPercent,
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildEmptyDepartmentPerformance() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Text(
+          "No department data available",
+          style: TextStyle(color: Colors.grey, fontSize: 14),
+        ),
+      ),
+    );
+  }
+
+  Color _getDepartmentColor(double progress) {
+    if (progress >= 0.8) return Colors.green;
+    if (progress >= 0.6) return Colors.blue;
+    if (progress >= 0.4) return Colors.orange;
+    return Colors.red;
+  }
+
+  Widget _buildDeptPerformanceBar(String dept, double value, Color color, int percent) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        Expanded(
+          flex: 2,
+          child: Text(dept,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        ),
+        Expanded(
+          flex: 4,
+          child: LinearProgressIndicator(
+            value: value,
+            backgroundColor: Colors.grey.shade200,
+            color: color,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(5),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text("$percent%",
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: color, fontSize: 13)),
+      ]),
+    );
+  }
+
+  // Recent Reports with Real Data
+  Widget _buildRecentReportsList() {
+    return Column(
+      children: recentReports.map((report) {
+        return _buildRecentReport(
+          report['title'] ?? 'No Title',
+          report['location'] ?? 'Location not specified',
+          report['status'] ?? 'Pending',
+          _getStatusColor(report['status']),
+          _getStatusIcon(report['status']),
+          report['time_ago'] ?? 'Recently',
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildEmptyRecentReports() {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: _whiteCardDecoration(),
+      child: const Center(
+        child: Text(
+          "No recent reports available",
+          style: TextStyle(color: Colors.grey, fontSize: 14),
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(String? status) {
+    switch ((status ?? '').toLowerCase()) {
+      case 'resolved':
+        return Colors.green;
+      case 'in progress':
+        return Colors.blue;
+      case 'urgent':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  IconData _getStatusIcon(String? status) {
+    switch ((status ?? '').toLowerCase()) {
+      case 'resolved':
+        return Icons.check_circle_outline;
+      case 'in progress':
+        return Icons.build_circle_outlined;
+      case 'urgent':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.pending_actions;
+    }
+  }
+
+  // Recent Report Card
   Widget _buildRecentReport(
-      String title, String subtitle, String status, Color color, IconData icon) {
+      String title, String subtitle, String status, Color color, IconData icon, String timeAgo) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: _whiteCardDecoration(),
@@ -442,7 +692,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         title: Text(title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 13)),
+        subtitle: Text("$subtitle • $timeAgo", style: const TextStyle(fontSize: 13)),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -457,7 +707,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // 🔹 Helper Widgets
+  // Helper Widgets
   Widget _buildAnimatedCard(
       String title, dynamic value, String change, Color color, IconData icon) {
     return Expanded(
@@ -471,14 +721,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                   color: Colors.black12,
                   blurRadius: 8,
-                  offset: const Offset(0, 4))
+                  offset: Offset(0, 4))
             ],
           ),
-          // ✅ Centered alignment inside the card
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -512,51 +761,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildDeptPerformanceBar(String dept, double value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(children: [
-        Expanded(
-          flex: 2,
-          child: Text(dept,
-              style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        ),
-        Expanded(
-          flex: 4,
-          child: LinearProgressIndicator(
-            value: value,
-            backgroundColor: Colors.grey.shade200,
-            color: color,
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(5),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text("${(value * 100).toStringAsFixed(0)}%",
-            style: TextStyle(
-                fontWeight: FontWeight.bold, color: color, fontSize: 13)),
-      ]),
-    );
-  }
-
-  PieChartSectionData _buildPieSection(Color color, double percent, String title) {
-    return PieChartSectionData(
-      color: color,
-      value: percent,
-      radius: 50,
-      title: title,
-      titleStyle: const TextStyle(
-          color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-    );
-  }
-
   BoxDecoration _whiteCardDecoration() => BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-              color: Colors.black12, blurRadius: 6, offset: const Offset(0, 4))
+              color: Colors.black12, blurRadius: 6, offset: Offset(0, 4))
         ],
       );
 
@@ -571,26 +781,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               fontSize: 22,
               fontWeight: FontWeight.bold,
               color: Colors.deepPurple)),
-    );
-  }
-}
-
-class _Legend extends StatelessWidget {
-  final Color color;
-  final String text;
-  const _Legend({required this.color, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(width: 12, height: 12, color: color),
-        const SizedBox(width: 6),
-        Text(text,
-            style:
-                const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-      ],
     );
   }
 }
