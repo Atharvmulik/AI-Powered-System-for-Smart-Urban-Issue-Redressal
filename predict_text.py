@@ -1,8 +1,6 @@
-# predict_text.py - FIXED VERSION
 import joblib
 import numpy as np
 
-# Load model and vectorizer
 clf = joblib.load("text_classifier.pkl")
 vectorizer = joblib.load("tfidf_vectorizer.pkl")
 

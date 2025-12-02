@@ -524,7 +524,7 @@ async def get_dashboard_summary(db: AsyncSession = Depends(get_db)):
         recent_reports = recent_reports_result.scalars().all()
 
         return {
-            "message": "Welcome to CivicEye - Make your city better today",
+            "message": "Welcome to UrbanSim AI - Make your city better today",
             "public_stats": {
                 "total_reports": total_reports_count,
                 "today_resolved": today_resolved_count,
@@ -1022,12 +1022,11 @@ async def get_report_timeline(
 ):
     """
     Returns detailed report information with timeline
-    For individual complaint tracking page (3rd image) - Public access
     """
     try:
         print(f"🔍 Fetching timeline for report ID: {report_id}")
         
-        # Simple query to check if report exists
+        # Get report
         report_result = await db.execute(
             select(Report).filter(Report.id == report_id)
         )
@@ -1049,16 +1048,20 @@ async def get_report_timeline(
             )
             category = category_result.scalar_one_or_none()
         
-        # Get status
-        status = None
+        # Get status - FIXED: renamed variable to avoid conflict
+        report_status = None
         if report.status_id:
             status_result = await db.execute(
                 select(Status).filter(Status.id == report.status_id)
             )
-            status = status_result.scalar_one_or_none()
+            report_status = status_result.scalar_one_or_none()
         
         print(f"📊 Category: {category.name if category else 'None'}")
-        print(f"📊 Status: {status.name if status else 'None'}")
+        print(f"📊 Status: {report_status.name if report_status else 'None'}")
+        
+        # ✅ FIX: Handle None dates safely
+        created_at = report.created_at if report.created_at else datetime.utcnow()
+        updated_at = report.updated_at if report.updated_at else created_at
         
         # Build timeline events
         timeline_events = []
@@ -1066,14 +1069,14 @@ async def get_report_timeline(
         # Event 1: Complaint Submitted
         timeline_events.append({
             "event": "Complaint Submitted",
-            "description": f"Your complaint was submitted on {report.created_at.strftime('%d %b. %I:%M %p')}",
-            "timestamp": report.created_at.isoformat(),
+            "description": f"Your complaint was submitted on {created_at.strftime('%d %b. %I:%M %p')}",
+            "timestamp": created_at.isoformat(),
             "status": "completed"
         })
         
-        # Event 2: Assigned to Department (simulate based on status)
-        if status and status.name in ["In Progress", "Resolved", "Closed"]:
-            assigned_time = report.created_at + timedelta(hours=2)
+        # Event 2: Assigned to Department
+        if report_status and report_status.name in ["In Progress", "Resolved", "Closed"]:
+            assigned_time = created_at + timedelta(hours=2)
             timeline_events.append({
                 "event": "Assigned to Department",
                 "description": f"Assigned to {category.name if category else 'Public Works Department'}",
@@ -1082,19 +1085,19 @@ async def get_report_timeline(
             })
         
         # Event 3: Work in Progress
-        if status and status.name in ["In Progress", "Resolved", "Closed"]:
-            work_start_time = report.created_at + timedelta(hours=4)
-            expected_resolution = report.created_at + timedelta(days=2)
+        if report_status and report_status.name in ["In Progress", "Resolved", "Closed"]:
+            work_start_time = created_at + timedelta(hours=4)
+            expected_resolution = created_at + timedelta(days=2)
             timeline_events.append({
                 "event": "Work in Progress",
                 "description": f"Work is in progress. Expected resolution: {expected_resolution.strftime('%d %b')}",
                 "timestamp": work_start_time.isoformat(),
-                "status": "completed" if status.name in ["Resolved", "Closed"] else "in_progress"
+                "status": "completed" if report_status.name in ["Resolved", "Closed"] else "in_progress"
             })
         
         # Event 4: Resolved
-        if status and status.name in ["Resolved", "Closed"]:
-            resolved_time = report.updated_at if report.updated_at else report.created_at + timedelta(days=2)
+        if report_status and report_status.name in ["Resolved", "Closed"]:
+            resolved_time = updated_at
             timeline_events.append({
                 "event": "Resolved",
                 "description": f"Issue resolved on {resolved_time.strftime('%d %b, %I:%M %p')}",
@@ -1110,13 +1113,13 @@ async def get_report_timeline(
             "complaint_details": {
                 "id": report.id,
                 "complaint_id": f"#{report.id:05d}",
-                "title": report.title,
-                "description": report.description,
-                "submitted_on": report.created_at.strftime("%d %b. %I:%M %p"),
-                "category": category.name if category else "Road Maintenance",
+                "title": report.title or "No Title",
+                "description": report.description or "No description",
+                "submitted_on": created_at.strftime("%d %b. %I:%M %p"),
+                "category": category.name if category else "General",
                 "department": "Public Works Department",
-                "urgency_level": report.urgency_level,
-                "current_status": status.name if status else "Reported",
+                "urgency_level": report.urgency_level or "medium",
+                "status": report_status.name if report_status else "submitted",
                 "location_address": report.location_address,
                 "location_lat": report.location_lat,
                 "location_long": report.location_long,
