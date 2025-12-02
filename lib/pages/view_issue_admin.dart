@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../models/admin_issue_model.dart'; // ✅ Add this import
+import '../models/admin_issue_model.dart';
 
 class IssueTrackingPage extends StatefulWidget {
   const IssueTrackingPage({super.key});
@@ -12,7 +12,7 @@ class IssueTrackingPage extends StatefulWidget {
 class _IssueTrackingPageState extends State<IssueTrackingPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<AdminIssue> _allIssues = []; // ✅ Changed to AdminIssue
+  List<AdminIssue> _allIssues = [];
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -30,7 +30,6 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
         _errorMessage = '';
       });
 
-      // ✅ Use the new AdminIssue method
       final issues = await ApiService().getAdminIssuesList();
       
       setState(() {
@@ -45,7 +44,6 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
     }
   }
 
-  // ✅ Now we can directly use status from AdminIssue
   List<AdminIssue> get pendingIssues => _allIssues.where((issue) => 
       issue.status.toLowerCase() == 'pending').toList();
 
@@ -57,12 +55,10 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
 
   Future<void> _updateIssueStatus(AdminIssue issue, String newStatus) async {
     try {
-      // ✅ Connect to actual API endpoint
       final response = await ApiService().updateIssueStatus(issue.id, newStatus);
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
         setState(() {
-          // Update local state
           _allIssues = _allIssues.map((i) => 
             i.id == issue.id ? AdminIssue(
               id: i.id,
@@ -73,7 +69,7 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
               description: i.description,
               category: i.category,
               urgencyLevel: i.urgencyLevel,
-              status: newStatus, // Updated status
+              status: newStatus,
               locationAddress: i.locationAddress,
               assignedDepartment: i.assignedDepartment,
               resolutionNotes: i.resolutionNotes,
@@ -103,56 +99,8 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
     }
   }
 
-  Future<void> _assignToDepartment(AdminIssue issue, String department) async {
-    try {
-      // ✅ Connect to actual API endpoint
-      final response = await ApiService().assignToDepartment(issue.id, department);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        setState(() {
-          _allIssues = _allIssues.map((i) => 
-            i.id == issue.id ? AdminIssue(
-              id: i.id,
-              userName: i.userName,
-              userEmail: i.userEmail,
-              userMobile: i.userMobile,
-              title: i.title,
-              description: i.description,
-              category: i.category,
-              urgencyLevel: i.urgencyLevel,
-              status: i.status,
-              locationAddress: i.locationAddress,
-              assignedDepartment: department, // Updated department
-              resolutionNotes: i.resolutionNotes,
-              resolvedBy: i.resolvedBy,
-              createdAt: i.createdAt,
-              updatedAt: DateTime.now(),
-            ) : i
-          ).toList();
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Assigned to $department'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        throw Exception('Failed to assign department: ${response.statusCode}');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error assigning department: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   Future<void> _resolveIssue(AdminIssue issue, String resolutionNotes, String resolvedBy) async {
     try {
-      // ✅ Connect to actual API endpoint
       final response = await ApiService().resolveIssue(issue.id, resolutionNotes, resolvedBy);
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -167,11 +115,11 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
               description: i.description,
               category: i.category,
               urgencyLevel: i.urgencyLevel,
-              status: 'Resolved', // Set to resolved
+              status: 'Resolved',
               locationAddress: i.locationAddress,
               assignedDepartment: i.assignedDepartment,
-              resolutionNotes: resolutionNotes, // Updated resolution notes
-              resolvedBy: resolvedBy, // Updated resolved by
+              resolutionNotes: resolutionNotes,
+              resolvedBy: resolvedBy,
               createdAt: i.createdAt,
               updatedAt: DateTime.now(),
             ) : i
@@ -199,7 +147,6 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
 
   Future<void> _deleteIssue(AdminIssue issue) async {
     try {
-      // ✅ Connect to actual DELETE endpoint
       final response = await ApiService().deleteIssue(issue.id);
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -280,7 +227,6 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // 🖼 Left-side Image
                     Container(
                       height: 230,
                       width: 230,
@@ -296,8 +242,6 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
                         ),
                       ),
                     ),
-
-                    // 📄 Right-side Text
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -425,7 +369,6 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
                     builder: (context) => IssueDetailPage(
                       issue: issue,
                       onStatusUpdated: (newStatus) => _updateIssueStatus(issue, newStatus),
-                      onDepartmentAssigned: (department) => _assignToDepartment(issue, department),
                       onIssueResolved: (notes, resolvedBy) => _resolveIssue(issue, notes, resolvedBy),
                       onIssueDeleted: () => _deleteIssue(issue),
                     ),
@@ -467,7 +410,7 @@ class _IssueTrackingPageState extends State<IssueTrackingPage>
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            "${issue.category} • 0.5 km", // Using fixed distance for now
+                            "${issue.category} • 0.5 km",
                             style: TextStyle(color: Colors.grey.shade700),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -534,7 +477,6 @@ class CurvedHeaderClipper extends CustomClipper<Path> {
 class IssueDetailPage extends StatefulWidget {
   final AdminIssue issue;
   final Function(String) onStatusUpdated;
-  final Function(String) onDepartmentAssigned;
   final Function(String, String) onIssueResolved;
   final VoidCallback onIssueDeleted;
 
@@ -542,7 +484,6 @@ class IssueDetailPage extends StatefulWidget {
     super.key,
     required this.issue,
     required this.onStatusUpdated,
-    required this.onDepartmentAssigned,
     required this.onIssueResolved,
     required this.onIssueDeleted,
   });
@@ -553,7 +494,6 @@ class IssueDetailPage extends StatefulWidget {
 
 class _IssueDetailPageState extends State<IssueDetailPage> {
   late String selectedStatus;
-  late String selectedDept;
   final TextEditingController _resolutionNotesController = TextEditingController();
   final TextEditingController _resolvedByController = TextEditingController();
 
@@ -593,7 +533,6 @@ class _IssueDetailPageState extends State<IssueDetailPage> {
   void initState() {
     super.initState();
     selectedStatus = widget.issue.status;
-    selectedDept = widget.issue.assignedDepartment ?? "Public Works";
     _resolvedByController.text = widget.issue.resolvedBy ?? "Admin";
     _resolutionNotesController.text = widget.issue.resolutionNotes ?? "";
   }
@@ -705,7 +644,7 @@ class _IssueDetailPageState extends State<IssueDetailPage> {
 
             const SizedBox(height: 20),
 
-            // Update Dropdowns
+            // Update Status Dropdown
             const Text(
               "Update Status",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -717,23 +656,6 @@ class _IssueDetailPageState extends State<IssueDetailPage> {
               });
               widget.onStatusUpdated(val);
             }),
-
-            const SizedBox(height: 16),
-            const Text(
-              "Assign to Department",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            _dropdown(
-              ["Public Works", "Water Dept", "Road Dept", "Sanitation Dept", "Other"],
-              selectedDept,
-              (val) {
-                setState(() {
-                  selectedDept = val;
-                });
-                widget.onDepartmentAssigned(val);
-              },
-            ),
 
             // Resolution Notes (for Resolved status)
             if (selectedStatus == "Resolved") ...[
@@ -772,7 +694,7 @@ class _IssueDetailPageState extends State<IssueDetailPage> {
 
             const SizedBox(height: 24),
 
-            // ✅ Buttons Row (Delete + Verify & Resolve)
+            // Buttons Row (Delete + Verify & Resolve)
             Row(
               children: [
                 Expanded(
@@ -863,74 +785,39 @@ class _IssueDetailPageState extends State<IssueDetailPage> {
   }
 
   Widget _dropdown(List<String> items, String selected, ValueChanged<String> onChanged) {
-    return StatefulBuilder(
-      builder: (context, setInnerState) {
-        String selectedValue = selected;
-        TextEditingController otherController = TextEditingController();
-        bool showOtherField = selectedValue == "Other";
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.white, Colors.deepPurple.shade100],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.deepPurple.withOpacity(0.1)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.deepPurple.shade100.withOpacity(0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: DropdownButton<String>(
-                value: selectedValue,
-                isExpanded: true,
-                underline: const SizedBox(),
-                dropdownColor: Colors.white,
-                items: items
-                    .map((e) => DropdownMenuItem<String>(
-                          value: e,
-                          child: Text(e),
-                        ))
-                    .toList(),
-                onChanged: (val) {
-                  setInnerState(() {
-                    selectedValue = val!;
-                    showOtherField = selectedValue == "Other";
-                    onChanged(selectedValue);
-                  });
-                },
-              ),
-            ),
-
-            if (showOtherField) ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: otherController,
-                decoration: InputDecoration(
-                  labelText: "Enter department name",
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onChanged: (value) {
-                  onChanged(value);
-                },
-              ),
-            ],
-          ],
-        );
-      },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.white, Colors.deepPurple.shade100],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.deepPurple.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.deepPurple.shade100.withOpacity(0.2),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: DropdownButton<String>(
+        value: selected,
+        isExpanded: true,
+        underline: const SizedBox(),
+        dropdownColor: Colors.white,
+        items: items
+            .map((e) => DropdownMenuItem<String>(
+                  value: e,
+                  child: Text(e),
+                ))
+            .toList(),
+        onChanged: (val) {
+          onChanged(val!);
+        },
+      ),
     );
   }
 

@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../guide/guide.dart';
@@ -26,7 +25,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<dynamic> reportedIssues = [];
   bool isLoading = true;
   int _bottomIndex = 0;
-  double resolvedPctToday = 0.62;
 
   final categories = const [
     _IssueCategory('Pothole', Icons.traffic),
@@ -68,8 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       print('📡 Response status: ${response.statusCode}');
       print(
         '📦 Full response: ${response.body}',
-      ); // Add this to see the actual data
-
+      ); 
       if (mounted) {
         setState(() {
           if (response.statusCode == 200) {
@@ -117,14 +114,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.white, // Changed background to white
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.teal[800], // Changed to dark teal
+        backgroundColor: Colors.teal[800],
         title: Row(
           children: [
             const Icon(
               Icons.radio_button_checked,
-              color: Colors.white, // Changed icon color to white for contrast
+              color: Colors.white,
               size: 22,
             ),
             const SizedBox(width: 8),
@@ -132,7 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'UrbanSim AI',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.white, // Changed text color to white for contrast
+                color: Colors.white,
               ),
             ),
           ],
@@ -143,14 +140,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(
               Icons.help_outline,
               color: Colors.white,
-            ), // White icon
+            ),
           ),
           IconButton(
             onPressed: () {},
             icon: const Icon(
               Icons.notifications_outlined,
               color: Colors.white,
-            ), // White icon
+            ),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -191,10 +188,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _reportedSection(cs),
             const SizedBox(height: 18),
             _reportIssueSection(cs),
-            const SizedBox(height: 18),
-            _resolvedTodaySection(cs),
-            const SizedBox(height: 18),
-            _recentActivityList(),
           ],
         ),
       ),
@@ -296,7 +289,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Wrap(
                   spacing: 8,
                   children: [
-                    // In _greetingCard method, update the Track chip:
                     _quickChip('Track', Icons.location_on, () {
                       Navigator.push(
                         context,
@@ -364,11 +356,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         type: issue['category'] ?? 'General',
                         urgency: _getUrgencyValue(
                           issue['urgency_level'] ?? 'medium',
-                        ), // Fixed field name
+                        ),
                         distanceKm: 0.5,
                       ),
                       onTap: () {
-                        // ✅ CORRECTED: Navigate to UserReportsPage instead of TrackIssuePage
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -417,94 +408,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _resolvedTodaySection(ColorScheme cs) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 90,
-            height: 90,
-            child: CustomPaint(
-              painter: _DonutPainter(
-                value: resolvedPctToday,
-                bgColor: Colors.teal.shade100,
-                fgColor: Colors.green.shade600,
-              ),
-              child: Center(
-                child: Text(
-                  '${(resolvedPctToday * 100).round()}%',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Issues resolved today',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
-                _miniBar('Pothole', 0.7, Colors.teal.shade700),
-                _miniBar('Water', 0.5, Colors.green.shade700),
-                _miniBar('Garbage', 0.6, Colors.black87),
-                _miniBar('Lights', 0.45, Colors.grey.shade800),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _recentActivityList() {
-    final items = [
-      const _ActivityItem(
-        icon: Icons.check_circle_outline,
-        title: 'Ward 12 cleared garbage pile',
-        subtitle: 'Confirmed by 8 citizens',
-      ),
-      const _ActivityItem(
-        icon: Icons.warning_amber_outlined,
-        title: 'New pothole reported near Library Rd',
-        subtitle: 'Urgency: High',
-      ),
-      const _ActivityItem(
-        icon: Icons.light_mode_outlined,
-        title: '2 streetlights fixed in Block C',
-        subtitle: 'Marked Resolved',
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Today\'s activity',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        ...items,
-      ],
-    );
-  }
-
   Widget _quickChip(String label, IconData icon, VoidCallback onTap) {
     return ActionChip(
       avatar: Icon(icon, size: 18, color: Colors.teal.shade800),
@@ -512,33 +415,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       side: BorderSide(color: Colors.teal.shade200),
       label: Text(label),
       onPressed: onTap,
-    );
-  }
-
-  Widget _miniBar(String label, double value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(width: 80, child: Text(label)),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: value,
-                    minHeight: 10,
-                    backgroundColor: Colors.grey.shade200,
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
@@ -708,103 +584,6 @@ class _IssueCategory {
   const _IssueCategory(this.title, this.icon);
   final String title;
   final IconData icon;
-}
-
-class _ActivityItem extends StatelessWidget {
-  const _ActivityItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.teal.shade700),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: Colors.grey.shade700)),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right, color: Colors.grey.shade600),
-        ],
-      ),
-    );
-  }
-}
-
-class _DonutPainter extends CustomPainter {
-  _DonutPainter({
-    required this.value,
-    required this.bgColor,
-    required this.fgColor,
-  });
-  final double value;
-  final Color bgColor;
-  final Color fgColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = 12.0;
-    final rect = Offset.zero & size;
-    final center = rect.center;
-    final radius = math.min(size.width, size.height) / 2 - stroke / 2;
-
-    final base = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..color = bgColor;
-
-    final fg = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..color = fgColor;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      2 * math.pi,
-      false,
-      base,
-    );
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      2 * math.pi * value,
-      false,
-      fg,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutPainter oldDelegate) {
-    return oldDelegate.value != value ||
-        oldDelegate.bgColor != bgColor ||
-        oldDelegate.fgColor != fgColor;
-  }
 }
 
 // Placeholder classes for navigation (you'll need to implement these)

@@ -25,7 +25,6 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _selectedIndex = 0;
   
-  // Real-time data variables
   int totalIssues = 0;
   int resolvedIssues = 0;
   int pendingIssues = 0;
@@ -33,7 +32,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String? errorMessage;
   final ApiService apiService = ApiService();
   
-  // New data variables
   List<dynamic> monthlyTrends = [];
   List<dynamic> departmentPerformance = [];
   List<dynamic> recentReports = [];
@@ -53,7 +51,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     try {
       print('🔄 Starting dashboard data load...');
 
-      // Load data sequentially with better error handling
       await _loadStatsData();
       await _loadMonthlyTrends();
       await _loadDepartmentPerformance();
@@ -95,7 +92,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
     } catch (e) {
       print('❌ Error loading stats: $e');
-      // Set default values on error
       setState(() {
         totalIssues = 0;
         resolvedIssues = 0;
@@ -124,7 +120,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
     } catch (e) {
       print('❌ Error loading monthly trends: $e');
-      // Set default data if API fails
       setState(() {
         monthlyTrends = [
           {"month": "Jan", "issues": 45},
@@ -158,7 +153,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
     } catch (e) {
       print('❌ Error loading department performance: $e');
-      // Set empty list on error
       setState(() {
         departmentPerformance = [];
       });
@@ -185,7 +179,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
     } catch (e) {
       print('❌ Error loading recent reports: $e');
-      // Set empty list on error
       setState(() {
         recentReports = [];
       });
@@ -193,7 +186,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   void _onNavTapped(int index) {
-    if (index == 4) { // Profile
+    if (index == 4) { 
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -204,18 +197,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
       );
     }  
-    else if (index == 3) { // Map View index
+    else if (index == 3) { 
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const AdminMapViewPage()),
       );
     }
-    else if (index == 2) { // Issue Reports index
+    else if (index == 2) { 
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const IssueTrackingPage()),
       );
-    } else if (index == 1) { // Department Analysis index
+    } else if (index == 1) { 
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const DepartmentAnalysisPage()),
@@ -282,7 +275,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // ✅ NEW METHOD: Get current page dynamically
   Widget _getCurrentPage() {
     if (_selectedIndex == 0) {
       return _buildDashboard();
@@ -291,9 +283,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  // Dashboard Page
   Widget _buildDashboard() {
-    // Show error message if there's an error
     if (errorMessage != null && !isLoading) {
       return Center(
         child: Column(
@@ -334,7 +324,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, 
         children: [
-          // Welcome Card
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -373,7 +362,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           const SizedBox(height: 40),
 
-          // Stats Cards - Show loading or real data
           if (isLoading)
             _buildLoadingStats()
           else
@@ -417,7 +405,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Loading state for stats
   Widget _buildLoadingStats() {
     return Column(
       children: [
@@ -461,7 +448,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Stats Cards with Real Data
   Widget _buildStatsCards() {
     return Column(
       children: [
@@ -493,9 +479,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Monthly Trends Chart with Real Data
   Widget _buildMonthlyTrendsChart() {
-    // Prepare data for chart
     final spots = monthlyTrends.asMap().entries.map((entry) {
       final index = entry.key;
       final data = entry.value;
@@ -560,7 +544,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Department Performance with Real Data
   Widget _buildDepartmentPerformanceList() {
     return Column(
       children: departmentPerformance.map((dept) {
@@ -624,7 +607,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Recent Reports with Real Data
   Widget _buildRecentReportsList() {
     return Column(
       children: recentReports.map((report) {
@@ -679,7 +661,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  // Recent Report Card
   Widget _buildRecentReport(
       String title, String subtitle, String status, Color color, IconData icon, String timeAgo) {
     return Container(
@@ -707,7 +688,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Helper Widgets
   Widget _buildAnimatedCard(
       String title, dynamic value, String change, Color color, IconData icon) {
     return Expanded(

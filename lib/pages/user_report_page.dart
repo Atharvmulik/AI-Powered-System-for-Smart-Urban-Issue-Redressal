@@ -45,7 +45,10 @@ class _UserReportsPageState extends State<UserReportsPage> {
       final ApiService apiService = ApiService();
       final response = query != null && query.isNotEmpty
           ? await apiService.searchUserReports(widget.userEmail, query)
-          : await apiService.getUserReports(widget.userEmail, statusFilter: filter);
+          : await apiService.getUserReports(
+              widget.userEmail,
+              statusFilter: filter,
+            );
 
       if (mounted) {
         setState(() {
@@ -56,7 +59,9 @@ class _UserReportsPageState extends State<UserReportsPage> {
           } else {
             _reports = [];
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to load reports: ${response.statusCode}')),
+              SnackBar(
+                content: Text('Failed to load reports: ${response.statusCode}'),
+              ),
             );
           }
           _isLoading = false;
@@ -68,9 +73,9 @@ class _UserReportsPageState extends State<UserReportsPage> {
           _isLoading = false;
           _reports = [];
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -155,8 +160,11 @@ class _UserReportsPageState extends State<UserReportsPage> {
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(
                                       color: Colors.grey[300],
-                                      child: const Icon(Icons.assignment, 
-                                        color: Colors.grey, size: 64),
+                                      child: const Icon(
+                                        Icons.assignment,
+                                        color: Colors.grey,
+                                        size: 64,
+                                      ),
                                     );
                                   },
                                 ),
@@ -201,7 +209,9 @@ class _UserReportsPageState extends State<UserReportsPage> {
                             decoration: InputDecoration(
                               hintText: 'Search complaints...',
                               border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
                               hintStyle: TextStyle(color: Colors.grey[600]),
                             ),
                             onChanged: _onSearch,
@@ -218,7 +228,10 @@ class _UserReportsPageState extends State<UserReportsPage> {
           // Filter chips
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(
+                vertical: 16.0,
+                horizontal: 16.0,
+              ),
               child: Wrap(
                 spacing: 10,
                 children: [
@@ -255,7 +268,9 @@ class _UserReportsPageState extends State<UserReportsPage> {
                 child: Padding(
                   padding: EdgeInsets.all(32.0),
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4169E1)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF4169E1),
+                    ),
                   ),
                 ),
               ),
@@ -283,29 +298,32 @@ class _UserReportsPageState extends State<UserReportsPage> {
             )
           else
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (BuildContext context, int index) {
-                  final report = _reports[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: _ComplaintCard(
-                      report: report,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ReportTimelinePage(
-                              reportId: report['id'],
-                              userEmail: widget.userEmail,
-                            ),
+              delegate: SliverChildBuilderDelegate((
+                BuildContext context,
+                int index,
+              ) {
+                final report = _reports[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  child: _ComplaintCard(
+                    report: report,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ReportDetailsPage(
+                            reportId: report['id'],
+                            userEmail: widget.userEmail,
                           ),
-                        );
-                      },
-                    ),
-                  );
-                },
-                childCount: _reports.length,
-              ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }, childCount: _reports.length),
             ),
         ],
       ),
@@ -318,10 +336,7 @@ class _CircleIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
 
-  const _CircleIconButton({
-    required this.icon,
-    required this.onPressed,
-  });
+  const _CircleIconButton({required this.icon, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -346,10 +361,7 @@ class _CurvedHeader extends StatelessWidget {
   final Color color;
   final double heightFactor;
 
-  const _CurvedHeader({
-    required this.color,
-    this.heightFactor = 0.85,
-  });
+  const _CurvedHeader({required this.color, this.heightFactor = 0.85});
 
   @override
   Widget build(BuildContext context) {
@@ -426,10 +438,7 @@ class _ComplaintCard extends StatefulWidget {
   final Map<String, dynamic> report;
   final VoidCallback onTap;
 
-  const _ComplaintCard({
-    required this.report,
-    required this.onTap,
-  });
+  const _ComplaintCard({required this.report, required this.onTap});
 
   @override
   State<_ComplaintCard> createState() => _ComplaintCardState();
@@ -499,8 +508,8 @@ class _ComplaintCardState extends State<_ComplaintCard> {
           duration: const Duration(milliseconds: 300),
           padding: const EdgeInsets.all(20.0),
           decoration: BoxDecoration(
-            color: _hovering 
-                ? Colors.white.withOpacity(0.9) 
+            color: _hovering
+                ? Colors.white.withOpacity(0.9)
                 : Colors.white.withOpacity(0.7),
             borderRadius: BorderRadius.circular(20.0),
             boxShadow: [
@@ -511,10 +520,7 @@ class _ComplaintCardState extends State<_ComplaintCard> {
                 spreadRadius: _hovering ? 1.0 : 0.0,
               ),
             ],
-            border: Border.all(
-              color: Colors.grey.withOpacity(0.1),
-              width: 1.0,
-            ),
+            border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1.0),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,8 +541,8 @@ class _ComplaintCardState extends State<_ComplaintCard> {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12.0, 
-                      vertical: 6.0
+                      horizontal: 12.0,
+                      vertical: 6.0,
                     ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.15),
@@ -555,18 +561,18 @@ class _ComplaintCardState extends State<_ComplaintCard> {
               ),
               const SizedBox(height: 12.0),
               _buildInfoRow(
-                Icons.fingerprint, 
-                "Complaint ID: ${widget.report['complaint_id'] ?? 'N/A'}"
+                Icons.fingerprint,
+                "Complaint ID: ${widget.report['complaint_id'] ?? 'N/A'}",
               ),
               const SizedBox(height: 6.0),
               _buildInfoRow(
-                Icons.calendar_today, 
-                "Date: ${widget.report['date'] ?? 'N/A'}"
+                Icons.calendar_today,
+                "Date: ${widget.report['date'] ?? 'N/A'}",
               ),
               const SizedBox(height: 6.0),
               _buildInfoRow(
-                Icons.category, 
-                "Category: ${widget.report['category'] ?? 'General'}"
+                Icons.category,
+                "Category: ${widget.report['category'] ?? 'General'}",
               ),
               const SizedBox(height: 12.0),
               LinearProgressIndicator(
@@ -588,67 +594,108 @@ class _ComplaintCardState extends State<_ComplaintCard> {
       children: [
         Icon(icon, size: 16.0, color: Colors.grey[600]),
         const SizedBox(width: 8.0),
-        Text(
-          text,
-          style: TextStyle(color: Colors.grey[700], fontSize: 14.0),
-        ),
+        Text(text, style: TextStyle(color: Colors.grey[700], fontSize: 14.0)),
       ],
     );
   }
 }
 
-// Report Timeline Page
-class ReportTimelinePage extends StatefulWidget {
+// Report Details Page (WITHOUT Timeline Section and Share Button)
+class ReportDetailsPage extends StatefulWidget {
   final int reportId;
   final String userEmail;
 
-  const ReportTimelinePage({
+  const ReportDetailsPage({
     super.key,
     required this.reportId,
     required this.userEmail,
   });
 
   @override
-  State<ReportTimelinePage> createState() => _ReportTimelinePageState();
+  State<ReportDetailsPage> createState() => _ReportDetailsPageState();
 }
 
-class _ReportTimelinePageState extends State<ReportTimelinePage> {
+class _ReportDetailsPageState extends State<ReportDetailsPage> {
   Map<String, dynamic>? _reportDetails;
-  List<dynamic> _timelineEvents = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadReportTimeline();
+    _loadReportDetails();
   }
 
-  Future<void> _loadReportTimeline() async {
+  Future<void> _loadReportDetails() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final ApiService apiService = ApiService();
+      print('🔄 Starting details fetch for report ID: ${widget.reportId}');
+
       final response = await apiService.getReportTimeline(widget.reportId);
+
+      print('📥 Received response with status: ${response.statusCode}');
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        try {
+          final data = json.decode(response.body);
+          print('✅ Successfully decoded JSON');
+          print('📦 Data keys: ${data.keys}');
+
+          setState(() {
+            _reportDetails = data['complaint_details'];
+            _isLoading = false;
+          });
+
+          print('✅ Details loaded successfully');
+        } catch (e) {
+          print('❌ JSON parsing error: $e');
+          setState(() {
+            _isLoading = false;
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error parsing complaint data: $e')),
+            );
+          }
+        }
+      } else {
+        print('❌ Server error: ${response.statusCode}');
+        print('❌ Error body: ${response.body}');
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to load details. Status: ${response.statusCode}',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Network error in details: $e');
 
       if (mounted) {
         setState(() {
-          if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-            _reportDetails = data['complaint_details'];
-            _timelineEvents = data['timeline'] ?? [];
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to load timeline: ${response.statusCode}')
-              ),
-            );
-          }
           _isLoading = false;
         });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text('Network error: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -662,14 +709,7 @@ class _ReportTimelinePageState extends State<ReportTimelinePage> {
         title: const Text('Complaint Details'),
         backgroundColor: const Color(0xFF4169E1),
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              // Share functionality
-            },
-          ),
-        ],
+        // ✅ REMOVED share button from actions
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -678,7 +718,11 @@ class _ReportTimelinePageState extends State<ReportTimelinePage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(height: 16),
                       const Text(
                         'Unable to load complaint details',
@@ -686,7 +730,7 @@ class _ReportTimelinePageState extends State<ReportTimelinePage> {
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton(
-                        onPressed: _loadReportTimeline,
+                        onPressed: _loadReportDetails,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF4169E1),
                           foregroundColor: Colors.white,
@@ -702,16 +746,7 @@ class _ReportTimelinePageState extends State<ReportTimelinePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _ComplaintDetailsCard(details: _reportDetails!),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Status Timeline',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _TimelineList(events: _timelineEvents),
+                      // ✅ REMOVED Status Timeline section completely
                     ],
                   ),
                 ),
@@ -719,7 +754,7 @@ class _ReportTimelinePageState extends State<ReportTimelinePage> {
   }
 }
 
-// Complaint Details Card
+// Complaint Details Card (same as before)
 class _ComplaintDetailsCard extends StatelessWidget {
   final Map<String, dynamic> details;
 
@@ -768,18 +803,15 @@ class _ComplaintDetailsCard extends StatelessWidget {
           children: [
             Text(
               details['title'] ?? 'No Title',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             _buildDetailRow('Complaint ID', details['complaint_id'] ?? 'N/A'),
             _buildDetailRow('Submitted on', details['submitted_on'] ?? 'N/A'),
             _buildDetailRow('Category', details['category'] ?? 'General'),
             _buildDetailRow(
-              'Department', 
-              details['department'] ?? 'Public Works Department'
+              'Department',
+              details['department'] ?? 'Public Works Department',
             ),
             if (details['location_address'] != null)
               _buildDetailRow('Location', details['location_address']!),
@@ -829,155 +861,6 @@ class _ComplaintDetailsCard extends StatelessWidget {
           Expanded(child: Text(value)),
         ],
       ),
-    );
-  }
-}
-
-// Timeline List
-class _TimelineList extends StatelessWidget {
-  final List<dynamic> events;
-
-  const _TimelineList({required this.events});
-
-  @override
-  Widget build(BuildContext context) {
-    if (events.isEmpty) {
-      return Card(
-        color: Colors.white.withOpacity(0.7),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: const Padding(
-          padding: EdgeInsets.all(20),
-          child: Center(
-            child: Text(
-              'No timeline events available',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: events.asMap().entries.map((entry) {
-        final index = entry.key;
-        final event = entry.value;
-        final isLast = index == events.length - 1;
-        return _TimelineItem(event: event, isLast: isLast);
-      }).toList(),
-    );
-  }
-}
-
-// Timeline Item
-class _TimelineItem extends StatelessWidget {
-  final Map<String, dynamic> event;
-  final bool isLast;
-
-  const _TimelineItem({
-    required this.event,
-    required this.isLast,
-  });
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'completed':
-        return const Color(0xFF4CAF50);
-      case 'in_progress':
-        return const Color(0xFFFF9800);
-      default:
-        return const Color(0xFF9E9E9E);
-    }
-  }
-
-  String _formatTimestamp(String timestamp) {
-    try {
-      final dateTime = DateTime.parse(timestamp);
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year} '
-             '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return timestamp;
-    }
-  }
-
-  IconData _getEventIcon(String? event) {
-    if (event == null) return Icons.info;
-    
-    if (event.toLowerCase().contains('submitted')) return Icons.report_problem;
-    if (event.toLowerCase().contains('assigned')) return Icons.assignment;
-    if (event.toLowerCase().contains('progress')) return Icons.build;
-    if (event.toLowerCase().contains('completed') || 
-        event.toLowerCase().contains('resolved')) {
-      return Icons.check_circle;
-    }
-    
-    return Icons.info;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: _getStatusColor(event['status'] ?? ''),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _getEventIcon(event['event']),
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 40,
-                color: Colors.grey[300],
-              ),
-          ],
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Container(
-            margin: EdgeInsets.only(bottom: isLast ? 0 : 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event['event'] ?? 'Unknown Event',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  event['description'] ?? 'No description',
-                  style: TextStyle(color: Colors.grey[700]),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _formatTimestamp(event['timestamp'] ?? ''),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -12,12 +12,10 @@ class ApiService {
   final String baseUrl = ApiConfig.baseUrl;
   String? _token;
 
-  // Set authentication token
   void setToken(String? token) {
     _token = token;
   }
 
-  // Get headers with authentication
   Map<String, String> getHeaders() {
     final headers = {'Content-Type': 'application/json'};
 
@@ -36,7 +34,6 @@ class ApiService {
     return await get(url);
   }
 
-  // Get issues within geographic bounds
   Future<http.Response> getIssuesInBounds(
     double north,
     double south,
@@ -47,7 +44,6 @@ class ApiService {
     return await get(url);
   }
 
-  // Get map statistics
   Future<http.Response> getMapStats() async {
     final url = ApiConfig.buildMapStatsUrl();
     return await get(url);
@@ -55,7 +51,6 @@ class ApiService {
 
   // ==================== CORE HTTP METHODS ====================
 
-  // Generic POST method
   Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
     try {
       final url = '$baseUrl$endpoint';
@@ -648,9 +643,26 @@ class ApiService {
     });
   }
 
-  // Complaint Details (PUBLIC)
   Future<http.Response> getReportTimeline(int reportId) async {
-    return await get('${ApiConfig.reportTimeline}/$reportId/timeline');
+    try {
+      print('📍 Fetching timeline for report ID: $reportId');
+      final endpoint = '/reports/$reportId/timeline';
+      print('📍 Full URL: $baseUrl$endpoint');
+
+      final response = await get(endpoint);
+
+      print('📡 Timeline Response Status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        print('✅ Timeline Response Body: ${response.body}');
+      } else {
+        print('❌ Error Response Body: ${response.body}');
+      }
+
+      return response;
+    } catch (e) {
+      print('❌ Timeline Fetch Error: $e');
+      rethrow;
+    }
   }
 
   // ==================== REFERENCE DATA ENDPOINTS ====================

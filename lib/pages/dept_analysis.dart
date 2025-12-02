@@ -63,8 +63,6 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
       case 'electricity_dept':
       case 'electricity dept':
         return 'Electricity Dept';
-      case 'public works':
-        return 'Public Works';
       case 'other':
         return 'Other';
       default:
@@ -82,8 +80,6 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
         return 'sanitation_dept';
       case 'Electricity Dept':
         return 'electricity_dept';
-      case 'Public Works':
-        return 'public_works';
       case 'Other':
         return 'other';
       case 'All Departments':
@@ -570,7 +566,6 @@ class _DepartmentAnalysisPageState extends State<DepartmentAnalysisPage> {
                                       "Road Dept",
                                       "Sanitation Dept",
                                       "Electricity Dept",
-                                      "Public Works",
                                     ].map((e) {
                                       return DropdownMenuItem<String>(
                                         value: e,
