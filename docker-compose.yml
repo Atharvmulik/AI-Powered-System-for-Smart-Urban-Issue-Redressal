@@ -1,4 +1,3 @@
-# docker-compose.yml
 services:
   postgres:
     image: postgres:15
@@ -7,7 +6,7 @@ services:
       POSTGRES_DB: urban_db
       POSTGRES_USER: urban_user
       POSTGRES_PASSWORD: urban_password
-      POSTGRES_HOST_AUTH_METHOD: trust  # This allows connections without password
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
@@ -17,6 +16,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: urban_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Adjust this to match how your FastAPI app reads DB URL
+      DATABASE_URL: postgresql+psycopg2://urban_user:urban_password@postgres:5432/urban_db
+      # Add any other env vars your app uses (JWT_SECRET, etc.)
+    ports:
+      - "8000:8000"
     restart: unless-stopped
 
 volumes:
