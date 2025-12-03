@@ -7,8 +7,7 @@ class Env {
   static const String appDescription = 'AI-Powered System for Smart Urban Issue Redressal';
   
   // API configuration
-  static const String apiBaseUrl = 'http://10.0.2.2:8000';
-  
+  static const String apiBaseUrl =  "https://ai-powered-system-for-smart-urban-issue.onrender.com"; 
   // Debug mode
   static const bool debug = true;
   
