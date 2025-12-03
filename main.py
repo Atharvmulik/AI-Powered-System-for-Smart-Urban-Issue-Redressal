@@ -393,7 +393,7 @@ async def get_urgency_levels():
     urgency_levels = ["High", "Medium", "Low"]
     return {"urgency_levels": urgency_levels}
 
-@app.post("/signup", response_model=UserResponse)
+@app.post("/api/auth/signup", response_model=UserResponse)
 async def signup(user_data: UserCreateEnhanced, db: AsyncSession = Depends(get_db)):
     # Check if user already exists
     result = await db.execute(select(User).filter(User.email == user_data.email))
