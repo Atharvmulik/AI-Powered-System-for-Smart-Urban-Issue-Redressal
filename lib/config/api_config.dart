@@ -1,6 +1,5 @@
 import 'env.dart';
 
-
 class ApiConfig {
   static const String baseUrl = Env.apiBaseUrl;
   
@@ -13,7 +12,7 @@ class ApiConfig {
   
   // ✅ CORRECTED: Exact endpoints from your FastAPI backend
   static const String loginEndpoint = '/login';
-  static const String registerEndpoint = '/signup'; 
+  static const String registerEndpoint = '/api/auth/signup'; 
   static const String reportIssueEndpoint = '/reports/';
   static const String getIssuesEndpoint = '/reports/';
   static const String getUserIssuesEndpoint = '/users/me/reports';
